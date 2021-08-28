@@ -11,20 +11,21 @@ import (
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
-	"github.com/grafana/dskit/kv"
-	"github.com/pkg/errors"
 	"github.com/pkg/errors"
 	perrors "github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/atomic"
 
-	"github.com/cortexproject/cortex/pkg/util"
-	"github.com/cortexproject/cortex/pkg/util/log"
+	"github.com/grafana/dskit/flagext"
+	"github.com/grafana/dskit/kv"
+	"github.com/grafana/dskit/services"
+	"github.com/grafana/dskit/timeutil"
 )
 
 // LifecyclerConfig is the config to build a Lifecycler.
 type LifecyclerConfig struct {
 	RingConfig Config `yaml:"ring"`
+	logger     log.Logger
 
 	// Config for the ingester lifecycle control
 	NumTokens                int           `yaml:"num_tokens"`
@@ -73,7 +74,8 @@ func (cfg *LifecyclerConfig) RegisterFlagsWithPrefix(prefix string, f *flag.Flag
 
 	hostname, err := os.Hostname()
 	if err != nil {
-		panic(fmt.Errorf("failed to get hostname %s", err))
+		level.Error(cfg.logger).Log("msg", "failed to get hostname", "err", err)
+		os.Exit(1)
 	}
 
 	cfg.InfNames = []string{"eth0", "en0"}
@@ -93,6 +95,7 @@ type Lifecycler struct {
 	cfg             LifecyclerConfig
 	flushTransferer FlushTransferer
 	KVStore         kv.Client
+	logger          log.Logger
 
 	actorChan chan func()
 
@@ -128,8 +131,8 @@ type Lifecycler struct {
 	logger            log.Logger
 }
 
-// NewLifecycler creates new Lifecycler. It must be started via StartAsync.
-func NewLifecycler(cfg LifecyclerConfig, flushTransferer FlushTransferer, ringName, ringKey string, flushOnShutdown bool, logger log.Logger, reg prometheus.Registerer) (*Lifecycler, error) {
+// NewLifecycler creates a new Lifecycler. It must be started via StartAsync.
+func NewLifecycler(cfg LifecyclerConfig, flushTransferer FlushTransferer, ringName, ringKey string, flushOnShutdown bool, reg prometheus.Registerer, logger log.Logger) (*Lifecycler, error) {
 	addr, err := GetInstanceAddr(cfg.Addr, cfg.InfNames, logger)
 	if err != nil {
 		return nil, err
@@ -141,7 +144,7 @@ func NewLifecycler(cfg LifecyclerConfig, flushTransferer FlushTransferer, ringNa
 		cfg.RingConfig.KVStore,
 		codec,
 		kv.RegistererWithKVName(prometheus.WrapRegistererWithPrefix("cortex_", reg), ringName+"-lifecycler"),
-		log.Logger,
+		logger,
 	)
 	if err != nil {
 		return nil, err
@@ -149,7 +152,8 @@ func NewLifecycler(cfg LifecyclerConfig, flushTransferer FlushTransferer, ringNa
 
 	zone := cfg.Zone
 	if zone != "" {
-		level.Warn(logger).Log("msg", "experimental feature in use", "feature", "Zone aware replication")
+		// TODO
+		// logger.WarnExperimentalUse("Zone aware replication")
 	}
 
 	// We do allow a nil FlushTransferer, but to keep the ring logic easier we assume
@@ -160,6 +164,7 @@ func NewLifecycler(cfg LifecyclerConfig, flushTransferer FlushTransferer, ringNa
 
 	l := &Lifecycler{
 		cfg:                  cfg,
+		logger:               logger,
 		flushTransferer:      flushTransferer,
 		KVStore:              store,
 		Addr:                 fmt.Sprintf("%s:%d", addr, port),
@@ -169,10 +174,12 @@ func NewLifecycler(cfg LifecyclerConfig, flushTransferer FlushTransferer, ringNa
 		flushOnShutdown:      atomic.NewBool(flushOnShutdown),
 		unregisterOnShutdown: atomic.NewBool(cfg.UnregisterOnShutdown),
 		Zone:                 zone,
-		actorChan:            make(chan func()),
-		state:                PENDING,
+
+		actorChan: make(chan func()),
+
+		state:     PENDING,
 		lifecyclerMetrics:    NewLifecyclerMetrics(ringName, reg),
-		logger:               logger,
+		startTime: time.Now(),
 	}
 
 	l.lifecyclerMetrics.tokensToOwn.Set(float64(cfg.NumTokens))
@@ -234,25 +241,15 @@ func (i *Lifecycler) checkRingHealthForReadiness(ctx context.Context) error {
 		return fmt.Errorf("no ring returned from the KV store")
 	}
 
-	if i.cfg.ReadinessCheckRingHealth {
-		if err := ringDesc.IsReady(time.Now(), i.cfg.RingConfig.HeartbeatTimeout); err != nil {
-			level.Warn(i.logger).Log("msg", "found an existing instance(s) with a problem in the ring, "+
-				"this instance cannot become ready until this problem is resolved. "+
-				"The /ring http endpoint on the distributor (or single binary) provides visibility into the ring.",
-				"ring", i.RingName, "err", err)
-			return err
-		}
-	} else {
-		instance, ok := ringDesc.Ingesters[i.ID]
-		if !ok {
-			return fmt.Errorf("instance %s not found in the ring", i.ID)
-		}
-
-		if err := instance.IsReady(time.Now(), i.cfg.RingConfig.HeartbeatTimeout); err != nil {
-			return err
-		}
+	if err := ringDesc.Ready(time.Now(), i.cfg.RingConfig.HeartbeatTimeout); err != nil {
+		level.Warn(i.logger).Log("msg", "found an existing instance(s) with a problem in the ring, "+
+			"this instance cannot become ready until this problem is resolved. "+
+			"The /ring http endpoint on the distributor (or single binary) provides visibility into the ring.",
+			"ring", i.RingName, "err", err)
+		return err
 	}
 
+	i.ready = true
 	return nil
 }
 

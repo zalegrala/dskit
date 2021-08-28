@@ -8,10 +8,8 @@ import (
 	"math"
 	"net/http"
 	"sort"
-	"strings"
+	strings "strings"
 	"time"
-
-	"github.com/go-kit/log/level"
 )
 
 const pageContent = `
@@ -125,7 +123,8 @@ func (r *Ring) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
 		ingesterID := req.FormValue("forget")
 		if err := r.forget(req.Context(), ingesterID); err != nil {
-			level.Error(r.logger).Log("msg", "error forgetting instance", "err", err)
+			// TODO
+			// level.Error(logger.WithContext(req.Context())).Log("msg", "error forgetting instance", "err", err)
 		}
 
 		// Implement PRG pattern to prevent double-POST and work with CSRF middleware.
@@ -188,7 +187,7 @@ func (r *Ring) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}, pageTemplate, req)
 }
 
-// RenderHTTPResponse either responds with json or a rendered html page using the passed in template
+// renderHTTPResponse either responds with json or a rendered html page using the passed in template
 // by checking the Accepts header
 func renderHTTPResponse(w http.ResponseWriter, v httpResponse, t *template.Template, r *http.Request) {
 	accept := r.Header.Get("Accept")
@@ -203,7 +202,7 @@ func renderHTTPResponse(w http.ResponseWriter, v httpResponse, t *template.Templ
 	}
 }
 
-// WriteJSONResponse writes some JSON as a HTTP response.
+// writeJSONResponse writes some JSON as a HTTP response.
 func writeJSONResponse(w http.ResponseWriter, v httpResponse) {
 	w.Header().Set("Content-Type", "application/json")
 
