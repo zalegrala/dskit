@@ -10,12 +10,10 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/grafana/dskit/services"
+	"github.com/grafana/dskit/stringutil"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/weaveworks/common/user"
 	"google.golang.org/grpc/health/grpc_health_v1"
-
-	"github.com/cortexproject/cortex/pkg/util"
-	util_log "github.com/cortexproject/cortex/pkg/util/log"
 )
 
 // PoolClient is the interface that should be implemented by a
@@ -161,15 +159,15 @@ func (p *Pool) removeStaleClients() {
 
 	serviceAddrs, err := p.discovery()
 	if err != nil {
-		level.Error(util_log.Logger).Log("msg", "error removing stale clients", "err", err)
+		level.Error(p.logger).Log("msg", "error removing stale clients", "err", err)
 		return
 	}
 
 	for _, addr := range p.RegisteredAddresses() {
-		if util.StringsContain(serviceAddrs, addr) {
+		if stringutil.StringsContain(serviceAddrs, addr) {
 			continue
 		}
-		level.Info(util_log.Logger).Log("msg", "removing stale client", "addr", addr)
+		level.Info(p.logger).Log("msg", "removing stale client", "addr", addr)
 		p.RemoveClientFor(addr)
 	}
 }
@@ -182,7 +180,7 @@ func (p *Pool) cleanUnhealthy() {
 		if ok {
 			err := healthCheck(client, p.cfg.HealthCheckTimeout)
 			if err != nil {
-				level.Warn(util_log.Logger).Log("msg", fmt.Sprintf("removing %s failing healthcheck", p.clientName), "addr", addr, "reason", err)
+				level.Warn(p.logger).Log("msg", fmt.Sprintf("removing %s failing healthcheck", p.clientName), "addr", addr, "reason", err)
 				p.RemoveClientFor(addr)
 			}
 		}
