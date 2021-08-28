@@ -6,9 +6,9 @@ import (
 	"sort"
 	"time"
 
+	"github.com/go-kit/kit/log"
 	"github.com/grafana/dskit/backoff"
-
-	"github.com/cortexproject/cortex/pkg/util"
+	"github.com/grafana/dskit/netutil"
 )
 
 // GenerateTokens make numTokens unique random tokens, none of which clash
@@ -46,12 +46,12 @@ func GenerateTokens(numTokens int, takenTokens []uint32) []uint32 {
 
 // GetInstanceAddr returns the address to use to register the instance
 // in the ring.
-func GetInstanceAddr(configAddr string, netInterfaces []string) (string, error) {
+func GetInstanceAddr(configAddr string, netInterfaces []string, logger log.Logger) (string, error) {
 	if configAddr != "" {
 		return configAddr, nil
 	}
 
-	addr, err := util.GetFirstAddressOf(netInterfaces)
+	addr, err := netutil.GetFirstAddressOf(netInterfaces, logger)
 	if err != nil {
 		return "", err
 	}
