@@ -14,7 +14,7 @@ import (
 
 	"github.com/grafana/dskit/kv"
 	"github.com/grafana/dskit/services"
-	"github.com/grafana/dskit/timeutil"
+	dstime "github.com/grafana/dskit/time"
 )
 
 type BasicLifecyclerDelegate interface {
