@@ -25,7 +25,7 @@ import (
 
 	"github.com/cortexproject/cortex/integration/ca"
 	"github.com/grafana/dskit/dshttp"
-	"github.com/grafana/dskit/util/grpcclient"
+	"github.com/grafana/dskit/grpcclient"
 )
 
 type tcIntegrationClientServer struct {

@@ -15,7 +15,7 @@ import (
 	"github.com/grafana/dskit/chunk"
 	"github.com/grafana/dskit/chunk/cassandra"
 	"github.com/grafana/dskit/chunk/local"
-	"github.com/grafana/dskit/util/validation"
+	"github.com/grafana/dskit/validation"
 )
 
 func TestFactoryStop(t *testing.T) {

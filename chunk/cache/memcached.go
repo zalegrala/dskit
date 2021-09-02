@@ -15,7 +15,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	instr "github.com/weaveworks/common/instrument"
 
-	"github.com/grafana/dskit/util/math"
+	"github.com/grafana/dskit/math"
 )
 
 type observableVecCollector struct {

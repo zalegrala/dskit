@@ -19,8 +19,8 @@ import (
 	"github.com/grafana/dskit/chunk/cache"
 	"github.com/grafana/dskit/chunk/encoding"
 	"github.com/grafana/dskit/dslog"
-	"github.com/grafana/dskit/util/extract"
-	"github.com/grafana/dskit/util/validation"
+	"github.com/grafana/dskit/extract"
+	"github.com/grafana/dskit/validation"
 )
 
 var (

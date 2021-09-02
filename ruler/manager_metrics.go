@@ -3,13 +3,13 @@ package ruler
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/grafana/dskit/util"
+	"github.com/grafana/dskit/userreg"
 )
 
 // ManagerMetrics aggregates metrics exported by the Prometheus
 // rules package and returns them as Cortex metrics
 type ManagerMetrics struct {
-	regs *util.UserRegistries
+	regs *userreg.UserRegistries
 
 	EvalDuration         *prometheus.Desc
 	IterationDuration    *prometheus.Desc
@@ -27,7 +27,7 @@ type ManagerMetrics struct {
 // NewManagerMetrics returns a ManagerMetrics struct
 func NewManagerMetrics() *ManagerMetrics {
 	return &ManagerMetrics{
-		regs: util.NewUserRegistries(),
+		regs: userreg.NewUserRegistries(),
 
 		EvalDuration: prometheus.NewDesc(
 			"cortex_prometheus_rule_evaluation_duration_seconds",

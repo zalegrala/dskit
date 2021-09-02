@@ -14,7 +14,7 @@ import (
 	google_http "google.golang.org/api/transport/http"
 	"google.golang.org/grpc"
 
-	"github.com/grafana/dskit/util/middleware"
+	"github.com/grafana/dskit/middleware"
 )
 
 var (

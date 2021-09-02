@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	tsdb_errors "github.com/prometheus/prometheus/tsdb/errors"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/grafana/dskit/math"
@@ -57,6 +58,8 @@ func ForEachUser(ctx context.Context, userIDs []string, concurrency int, userFun
 		return ctx.Err()
 	}
 
+	errsMx.Lock()
+	defer errsMx.Unlock()
 	return errs.Err()
 }
 

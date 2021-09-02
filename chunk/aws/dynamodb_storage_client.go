@@ -30,7 +30,7 @@ import (
 	"github.com/weaveworks/common/instrument"
 
 	"github.com/grafana/dskit/chunk"
-	"github.com/grafana/dskit/util/math"
+	"github.com/grafana/dskit/math"
 )
 
 const (

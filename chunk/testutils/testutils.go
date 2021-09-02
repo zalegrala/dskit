@@ -12,9 +12,9 @@ import (
 
 	"github.com/grafana/dskit/chunk"
 	"github.com/grafana/dskit/chunk/cache"
-	promchunk "github.com/grafana/dskit/chunk/encoding"
+	"github.com/grafana/dskit/chunk/encoding"
 	"github.com/grafana/dskit/ingester/client"
-	"github.com/grafana/dskit/util/validation"
+	"github.com/grafana/dskit/validation"
 )
 
 const (
@@ -83,7 +83,7 @@ func CreateChunks(startIndex, batchSize int, from model.Time, through model.Time
 }
 
 func dummyChunkFor(from, through model.Time, metric labels.Labels) chunk.Chunk {
-	cs := promchunk.New()
+	cs := encoding.New()
 
 	for ts := from; ts <= through; ts = ts.Add(15 * time.Second) {
 		_, err := cs.Add(model.SamplePair{Timestamp: ts, Value: 0})

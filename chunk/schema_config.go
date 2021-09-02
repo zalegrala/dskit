@@ -13,7 +13,7 @@ import (
 	"github.com/weaveworks/common/mtime"
 	yaml "gopkg.in/yaml.v2"
 
-	"github.com/grafana/dskit/util/math"
+	"github.com/grafana/dskit/math"
 )
 
 const (
