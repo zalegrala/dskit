@@ -18,13 +18,12 @@ import (
 	"github.com/prometheus/prometheus/discovery/dns"
 	"github.com/prometheus/prometheus/notifier"
 
-	"github.com/grafana/dskit/util"
-	"github.com/grafana/dskit/util/tls"
+	"github.com/grafana/dskit/dshttp"
 )
 
 type NotifierConfig struct {
-	TLS       tls.ClientConfig `yaml:",inline"`
-	BasicAuth util.BasicAuth   `yaml:",inline"`
+	TLS       dshttp.TLSClientConfig `yaml:",inline"`
+	BasicAuth dshttp.BasicAuth       `yaml:",inline"`
 }
 
 func (cfg *NotifierConfig) RegisterFlags(f *flag.FlagSet) {

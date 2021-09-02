@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
-	"github.com/grafana/dskit/cortexpb"
+	"github.com/grafana/dskit/dskitpb"
 )
 
 type pusherMock struct {
@@ -16,11 +16,11 @@ func newPusherMock() *pusherMock {
 	return &pusherMock{}
 }
 
-func (m *pusherMock) Push(ctx context.Context, req *cortexpb.WriteRequest) (*cortexpb.WriteResponse, error) {
+func (m *pusherMock) Push(ctx context.Context, req *dskitpb.WriteRequest) (*dskitpb.WriteResponse, error) {
 	args := m.Called(ctx, req)
-	return args.Get(0).(*cortexpb.WriteResponse), args.Error(1)
+	return args.Get(0).(*dskitpb.WriteResponse), args.Error(1)
 }
 
-func (m *pusherMock) MockPush(res *cortexpb.WriteResponse, err error) {
+func (m *pusherMock) MockPush(res *dskitpb.WriteResponse, err error) {
 	m.On("Push", mock.Anything, mock.Anything).Return(res, err)
 }

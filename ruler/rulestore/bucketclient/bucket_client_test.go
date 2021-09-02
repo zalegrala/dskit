@@ -17,7 +17,7 @@ import (
 	"github.com/thanos-io/thanos/pkg/objstore"
 
 	"github.com/grafana/dskit/chunk"
-	"github.com/grafana/dskit/cortexpb"
+	"github.com/grafana/dskit/dskitpb"
 	"github.com/grafana/dskit/ruler/rulespb"
 	"github.com/grafana/dskit/ruler/rulestore"
 	"github.com/grafana/dskit/ruler/rulestore/objectclient"
@@ -148,7 +148,7 @@ func TestLoadRules(t *testing.T) {
 				{User: "user1", Namespace: "hello", Name: "first testGroup", Interval: time.Minute, Rules: []*rulespb.RuleDesc{
 					{
 						For:    5 * time.Minute,
-						Labels: []cortexpb.LabelAdapter{{Name: "label1", Value: "value1"}},
+						Labels: []dskitpb.LabelAdapter{{Name: "label1", Value: "value1"}},
 					},
 				}},
 				{User: "user1", Namespace: "hello", Name: "second testGroup", Interval: 2 * time.Minute},

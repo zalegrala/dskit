@@ -17,6 +17,7 @@ import (
 	"github.com/grafana/dskit/flagext"
 	"github.com/grafana/dskit/kv"
 	"github.com/grafana/dskit/services"
+	"github.com/grafana/dskit/sharding"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -27,21 +28,22 @@ import (
 	"github.com/weaveworks/common/user"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/grafana/dskit/cortexpb"
-	"github.com/grafana/dskit/ring"
-	ring_client "github.com/grafana/dskit/ring/client"
 	"github.com/grafana/dskit/ruler/rulespb"
 	"github.com/grafana/dskit/ruler/rulestore"
 	"github.com/grafana/dskit/tenant"
 	"github.com/grafana/dskit/util"
 	"github.com/grafana/dskit/util/concurrency"
 	"github.com/grafana/dskit/util/grpcclient"
-	util_log "github.com/grafana/dskit/util/log"
 	"github.com/grafana/dskit/util/validation"
+
+	"github.com/grafana/dskit/dskitpb"
+	"github.com/grafana/dskit/dslog"
+	"github.com/grafana/dskit/ring"
+	"github.com/grafana/dskit/ring/client"
 )
 
 var (
-	supportedShardingStrategies = []string{util.ShardingStrategyDefault, util.ShardingStrategyShuffle}
+	supportedShardingStrategies = []string{sharding.StrategyDefault, sharding.StrategyShuffle}
 
 	// Validation errors.
 	errInvalidShardingStrategy = errors.New("invalid sharding strategy")
@@ -67,6 +69,8 @@ const (
 
 // Config is the configuration for the recording rules server.
 type Config struct {
+	// Logger is the logger to use.
+	Logger log.Logger
 	// This is used for template expansion in alerts; must be a valid URL.
 	ExternalURL flagext.URLValue `yaml:"external_url"`
 	// GRPC Client configuration.
@@ -125,7 +129,7 @@ func (cfg *Config) Validate(limits validation.Limits, log log.Logger) error {
 		return errInvalidShardingStrategy
 	}
 
-	if cfg.ShardingStrategy == util.ShardingStrategyShuffle && limits.RulerTenantShardSize <= 0 {
+	if cfg.ShardingStrategy == sharding.StrategyShuffle && limits.RulerTenantShardSize <= 0 {
 		return errInvalidTenantShardSize
 	}
 
@@ -148,11 +152,11 @@ func (cfg *Config) RegisterFlags(f *flag.FlagSet) {
 	// Deprecated Flags that will be maintained to avoid user disruption
 
 	//lint:ignore faillint Need to pass the global logger like this for warning on deprecated methods
-	flagext.DeprecatedFlag(f, "ruler.client-timeout", "This flag has been renamed to ruler.configs.client-timeout", util_log.Logger)
+	flagext.DeprecatedFlag(f, "ruler.client-timeout", "This flag has been renamed to ruler.configs.client-timeout", cfg.Logger)
 	//lint:ignore faillint Need to pass the global logger like this for warning on deprecated methods
-	flagext.DeprecatedFlag(f, "ruler.group-timeout", "This flag is no longer functional.", util_log.Logger)
+	flagext.DeprecatedFlag(f, "ruler.group-timeout", "This flag is no longer functional.", cfg.Logger)
 	//lint:ignore faillint Need to pass the global logger like this for warning on deprecated methods
-	flagext.DeprecatedFlag(f, "ruler.num-workers", "This flag is no longer functional. For increased concurrency horizontal sharding is recommended", util_log.Logger)
+	flagext.DeprecatedFlag(f, "ruler.num-workers", "This flag is no longer functional. For increased concurrency horizontal sharding is recommended", cfg.Logger)
 
 	cfg.ExternalURL.URL, _ = url.Parse("") // Must be non-nil
 	f.Var(&cfg.ExternalURL, "ruler.external.url", "URL of alerts return path.")
@@ -168,7 +172,7 @@ func (cfg *Config) RegisterFlags(f *flag.FlagSet) {
 
 	f.DurationVar(&cfg.SearchPendingFor, "ruler.search-pending-for", 5*time.Minute, "Time to spend searching for a pending ruler when shutting down.")
 	f.BoolVar(&cfg.EnableSharding, "ruler.enable-sharding", false, "Distribute rule evaluation using ring backend")
-	f.StringVar(&cfg.ShardingStrategy, "ruler.sharding-strategy", util.ShardingStrategyDefault, fmt.Sprintf("The sharding strategy to use. Supported values are: %s.", strings.Join(supportedShardingStrategies, ", ")))
+	f.StringVar(&cfg.ShardingStrategy, "ruler.sharding-strategy", sharding.StrategyDefault, fmt.Sprintf("The sharding strategy to use. Supported values are: %s.", strings.Join(supportedShardingStrategies, ", ")))
 	f.DurationVar(&cfg.FlushCheckPeriod, "ruler.flush-period", 1*time.Minute, "Period with which to attempt to flush rule groups.")
 	f.StringVar(&cfg.RulePath, "ruler.rule-path", "/rules", "file path to store temporary rule files for the prometheus rule managers")
 	f.BoolVar(&cfg.EnableAPI, "experimental.ruler.enable-api", false, "Enable the ruler api")
@@ -237,7 +241,7 @@ type Ruler struct {
 	subservicesWatcher *services.FailureWatcher
 
 	// Pool of clients used to connect to other ruler replicas.
-	clientsPool *ring_client.Pool
+	clientsPool *client.Pool
 
 	ringCheckErrors prometheus.Counter
 	rulerSync       *prometheus.CounterVec
@@ -502,10 +506,10 @@ func (r *Ruler) listRules(ctx context.Context) (result map[string]rulespb.RuleGr
 	case !r.cfg.EnableSharding:
 		result, err = r.listRulesNoSharding(ctx)
 
-	case r.cfg.ShardingStrategy == util.ShardingStrategyDefault:
+	case r.cfg.ShardingStrategy == sharding.StrategyDefault:
 		result, err = r.listRulesShardingDefault(ctx)
 
-	case r.cfg.ShardingStrategy == util.ShardingStrategyShuffle:
+	case r.cfg.ShardingStrategy == sharding.StrategyShuffle:
 		result, err = r.listRulesShuffleSharding(ctx)
 
 	default:
@@ -642,7 +646,7 @@ func filterRuleGroups(userID string, ruleGroups []*rulespb.RuleGroupDesc, ring r
 // GetRules retrieves the running rules from this ruler and all running rulers in the ring if
 // sharding is enabled
 func (r *Ruler) GetRules(ctx context.Context) ([]*GroupStateDesc, error) {
-	userID, err := tenant.TenantID(ctx)
+	userID, err := tenant.ID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("no user id found in context")
 	}
@@ -694,8 +698,8 @@ func (r *Ruler) getLocalRules(userID string) ([]*GroupStateDesc, error) {
 				for _, a := range rule.ActiveAlerts() {
 					alerts = append(alerts, &AlertStateDesc{
 						State:       a.State.String(),
-						Labels:      cortexpb.FromLabelsToLabelAdapters(a.Labels),
-						Annotations: cortexpb.FromLabelsToLabelAdapters(a.Annotations),
+						Labels:      dskitpb.FromLabelsToLabelAdapters(a.Labels),
+						Annotations: dskitpb.FromLabelsToLabelAdapters(a.Annotations),
 						Value:       a.Value,
 						ActiveAt:    a.ActiveAt,
 						FiredAt:     a.FiredAt,
@@ -709,8 +713,8 @@ func (r *Ruler) getLocalRules(userID string) ([]*GroupStateDesc, error) {
 						Expr:        rule.Query().String(),
 						Alert:       rule.Name(),
 						For:         rule.HoldDuration(),
-						Labels:      cortexpb.FromLabelsToLabelAdapters(rule.Labels()),
-						Annotations: cortexpb.FromLabelsToLabelAdapters(rule.Annotations()),
+						Labels:      dskitpb.FromLabelsToLabelAdapters(rule.Labels()),
+						Annotations: dskitpb.FromLabelsToLabelAdapters(rule.Annotations()),
 					},
 					State:               rule.State().String(),
 					Health:              string(rule.Health()),
@@ -724,7 +728,7 @@ func (r *Ruler) getLocalRules(userID string) ([]*GroupStateDesc, error) {
 					Rule: &rulespb.RuleDesc{
 						Record: rule.Name(),
 						Expr:   rule.Query().String(),
-						Labels: cortexpb.FromLabelsToLabelAdapters(rule.Labels()),
+						Labels: dskitpb.FromLabelsToLabelAdapters(rule.Labels()),
 					},
 					Health:              string(rule.Health()),
 					LastError:           lastError,
@@ -785,7 +789,7 @@ func (r *Ruler) getShardedRules(ctx context.Context) ([]*GroupStateDesc, error) 
 
 // Rules implements the rules service
 func (r *Ruler) Rules(ctx context.Context, in *RulesRequest) (*RulesResponse, error) {
-	userID, err := tenant.TenantID(ctx)
+	userID, err := tenant.ID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("no user id found in context")
 	}
@@ -830,9 +834,9 @@ func (r *Ruler) AssertMaxRulesPerRuleGroup(userID string, rules int) error {
 }
 
 func (r *Ruler) DeleteTenantConfiguration(w http.ResponseWriter, req *http.Request) {
-	logger := util_log.WithContext(req.Context(), r.logger)
+	logger := dslog.WithContext(req.Context(), r.logger)
 
-	userID, err := tenant.TenantID(req.Context())
+	userID, err := tenant.ID(req.Context())
 	if err != nil {
 		// When Cortex is running, it uses Auth Middleware for checking X-Scope-OrgID and injecting tenant into context.
 		// Auth Middleware sends http.StatusUnauthorized if X-Scope-OrgID is missing, so we do too here, for consistency.
@@ -851,7 +855,7 @@ func (r *Ruler) DeleteTenantConfiguration(w http.ResponseWriter, req *http.Reque
 }
 
 func (r *Ruler) ListAllRules(w http.ResponseWriter, req *http.Request) {
-	logger := util_log.WithContext(req.Context(), r.logger)
+	logger := dslog.WithContext(req.Context(), r.logger)
 
 	userIDs, err := r.store.ListAllUsers(req.Context())
 	if err != nil {

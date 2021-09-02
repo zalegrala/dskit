@@ -5,14 +5,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/grafana/dskit/dshttp"
 	config_util "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/discovery"
 	"github.com/prometheus/prometheus/discovery/dns"
 	"github.com/stretchr/testify/require"
-
-	"github.com/grafana/dskit/util"
 )
 
 func TestBuildNotifierConfig(t *testing.T) {
@@ -192,7 +191,7 @@ func TestBuildNotifierConfig(t *testing.T) {
 			cfg: &Config{
 				AlertmanagerURL: "http://marco:hunter2@alertmanager-0.default.svc.cluster.local/alertmanager",
 				Notifier: NotifierConfig{
-					BasicAuth: util.BasicAuth{
+					BasicAuth: dshttp.BasicAuth{
 						Username: "jacob",
 						Password: "test",
 					},

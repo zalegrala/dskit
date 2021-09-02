@@ -1,21 +1,50 @@
+IMAGE_PREFIX ?= quay.io/cortexproject/
+BUILD_IMAGE ?= $(IMAGE_PREFIX)build-image
+TTY := --tty
+BUILD_IN_CONTAINER := true
+SUDO := $(shell docker info >/dev/null 2>&1 || echo "sudo -E")
+
 # put tools at the root of the folder
 PATH := $(CURDIR)/.tools/bin:$(PATH)
-#
+
+DONT_FIND := -name lib -prune -o -name .git -prune -o -name .cache -prune -o -name .pkg -prune -o -name .tools -prune -o
+
 # Generating proto code is automated.
 PROTO_DEFS := $(shell find . $(DONT_FIND) -type f -name '*.proto' -print)
 PROTO_GOS := $(patsubst %.proto,%.pb.go,$(PROTO_DEFS))
-#
+
 # Manually declared dependencies
-dskitpb/dskit.pb.go: dskit/dskit.proto
+dskitpb/dskit.pb.go: dskitpb/dskit.proto
 ruler/rulespb/rules.pb.go: ruler/rulespb/rules.proto
 ruler/ruler.pb.go: ruler/ruler.proto
+ring/ring.pb.go: ring/ring.proto
+kv/memberlist/kv.pb.go: kv/memberlist/kv.proto
+chunk/grpc/grpc.pb.go: chunk/grpc/grpc.proto
+chunk/storage/caching_index_client.pb.go: chunk/storage/caching_index_client.proto
+chunk/purger/delete_plan.pb.go: chunk/purger/delete_plan.proto
+
+ifeq ($(BUILD_IN_CONTAINER),true)
+
+GOVOLUMES=	-v $(shell pwd)/.cache:/go/cache:delegated,z \
+			-v $(shell pwd)/.pkg:/go/pkg:delegated,z \
+			-v $(shell pwd):/go/src/github.com/cortexproject/cortex:delegated,z
+
+protos $(PROTO_GOS):
+	@mkdir -p .pkg
+	@mkdir -p .cache
+	@echo
+	@echo ">>>> Entering build container: $@"
+	$(SUDO) time docker run --rm $(TTY) -i $(GOVOLUMES) $(BUILD_IMAGE) $@;
+
+else
 
 protos: $(PROTO_GOS)
 
 %.pb.go:
-	@# The store-gateway RPC is based on Thanos which uses relative references to other protos, so we need
-	@# to configure all such relative paths.
-	protoc -I $(GOPATH)/src:./$(@D) --gogoslick_out=plugins=grpc,Mgoogle/protobuf/any.proto=github.com/gogo/protobuf/types,:./$(@D) ./$(patsubst %.pb.go,%.proto,$@)
+	pwd
+	protoc -I $(GOPATH)/src:./lib/github.com/gogo/protobuf:./lib:./:./$(@D) --gogoslick_out=plugins=grpc,Mgoogle/protobuf/any.proto=github.com/gogo/protobuf/types,:./ ./$(patsubst %.pb.go,%.proto,$@)
+
+endif
 
 check-protos: clean-protos protos
 	@git diff --exit-code -- $(PROTO_GOS)

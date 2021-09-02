@@ -7,14 +7,14 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
-	"github.com/grafana/dskit/kv/consul"
-	"github.com/grafana/dskit/services"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/grafana/dskit/kv/consul"
 	"github.com/grafana/dskit/ring"
 	"github.com/grafana/dskit/ring/testutils"
-	"github.com/grafana/dskit/util/test"
+	"github.com/grafana/dskit/services"
+	"github.com/grafana/dskit/testutil"
 )
 
 // TestRulerShutdown tests shutting down ruler unregisters correctly
@@ -38,7 +38,7 @@ func TestRulerShutdown(t *testing.T) {
 	defer services.StopAndAwaitTerminated(ctx, r) //nolint:errcheck
 
 	// Wait until the tokens are registered in the ring
-	test.Poll(t, 100*time.Millisecond, config.Ring.NumTokens, func() interface{} {
+	testutil.Poll(t, 100*time.Millisecond, config.Ring.NumTokens, func() interface{} {
 		return testutils.NumTokens(ringStore, "localhost", ring.RulerRingKey)
 	})
 
@@ -47,7 +47,7 @@ func TestRulerShutdown(t *testing.T) {
 	require.NoError(t, services.StopAndAwaitTerminated(context.Background(), r))
 
 	// Wait until the tokens are unregistered from the ring
-	test.Poll(t, 100*time.Millisecond, 0, func() interface{} {
+	testutil.Poll(t, 100*time.Millisecond, 0, func() interface{} {
 		return testutils.NumTokens(ringStore, "localhost", ring.RulerRingKey)
 	})
 }
@@ -86,7 +86,7 @@ func TestRuler_RingLifecyclerShouldAutoForgetUnhealthyInstances(t *testing.T) {
 	}))
 
 	// Ensure the unhealthy instance is removed from the ring.
-	test.Poll(t, time.Second*5, false, func() interface{} {
+	testutil.Poll(t, time.Second*5, false, func() interface{} {
 		d, err := ringStore.Get(ctx, ring.RulerRingKey)
 		if err != nil {
 			return err

@@ -8,8 +8,8 @@ package ruler;
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
-import "github.com/grafana/dskit/dskitpb/dskit.proto";
-import "github.com/grafana/dskit/ruler/rulespb/rules.proto";
+import "dskitpb/dskit.proto";
+import "rulespb/rules.proto";
 
 option (gogoproto.marshaler_all) = true;
 option (gogoproto.unmarshaler_all) = true;

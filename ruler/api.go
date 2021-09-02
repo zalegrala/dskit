@@ -20,11 +20,11 @@ import (
 	"github.com/weaveworks/common/user"
 	"gopkg.in/yaml.v3"
 
-	"github.com/grafana/dskit/cortexpb"
+	"github.com/grafana/dskit/dskitpb"
+	"github.com/grafana/dskit/dslog"
 	"github.com/grafana/dskit/ruler/rulespb"
 	"github.com/grafana/dskit/ruler/rulestore"
 	"github.com/grafana/dskit/tenant"
-	util_log "github.com/grafana/dskit/util/log"
 )
 
 // In order to reimplement the prometheus rules API, a large amount of code was copied over
@@ -137,8 +137,8 @@ func NewAPI(r *Ruler, s rulestore.RuleStore, logger log.Logger) *API {
 }
 
 func (a *API) PrometheusRules(w http.ResponseWriter, req *http.Request) {
-	logger := util_log.WithContext(req.Context(), a.logger)
-	userID, err := tenant.TenantID(req.Context())
+	logger := dslog.WithContext(req.Context(), a.logger)
+	userID, err := tenant.ID(req.Context())
 	if err != nil || userID == "" {
 		level.Error(logger).Log("msg", "error extracting org id from context", "err", err)
 		respondError(logger, w, "no valid org id found")
@@ -170,8 +170,8 @@ func (a *API) PrometheusRules(w http.ResponseWriter, req *http.Request) {
 				alerts := make([]*Alert, 0, len(rl.Alerts))
 				for _, a := range rl.Alerts {
 					alerts = append(alerts, &Alert{
-						Labels:      cortexpb.FromLabelAdaptersToLabels(a.Labels),
-						Annotations: cortexpb.FromLabelAdaptersToLabels(a.Annotations),
+						Labels:      dskitpb.FromLabelAdaptersToLabels(a.Labels),
+						Annotations: dskitpb.FromLabelAdaptersToLabels(a.Annotations),
 						State:       a.GetState(),
 						ActiveAt:    &a.ActiveAt,
 						Value:       strconv.FormatFloat(a.Value, 'e', -1, 64),
@@ -182,8 +182,8 @@ func (a *API) PrometheusRules(w http.ResponseWriter, req *http.Request) {
 					Name:           rl.Rule.GetAlert(),
 					Query:          rl.Rule.GetExpr(),
 					Duration:       rl.Rule.For.Seconds(),
-					Labels:         cortexpb.FromLabelAdaptersToLabels(rl.Rule.Labels),
-					Annotations:    cortexpb.FromLabelAdaptersToLabels(rl.Rule.Annotations),
+					Labels:         dskitpb.FromLabelAdaptersToLabels(rl.Rule.Labels),
+					Annotations:    dskitpb.FromLabelAdaptersToLabels(rl.Rule.Annotations),
 					Alerts:         alerts,
 					Health:         rl.GetHealth(),
 					LastError:      rl.GetLastError(),
@@ -195,7 +195,7 @@ func (a *API) PrometheusRules(w http.ResponseWriter, req *http.Request) {
 				grp.Rules[i] = recordingRule{
 					Name:           rl.Rule.GetRecord(),
 					Query:          rl.Rule.GetExpr(),
-					Labels:         cortexpb.FromLabelAdaptersToLabels(rl.Rule.Labels),
+					Labels:         dskitpb.FromLabelAdaptersToLabels(rl.Rule.Labels),
 					Health:         rl.GetHealth(),
 					LastError:      rl.GetLastError(),
 					LastEvaluation: rl.GetEvaluationTimestamp(),
@@ -229,8 +229,8 @@ func (a *API) PrometheusRules(w http.ResponseWriter, req *http.Request) {
 }
 
 func (a *API) PrometheusAlerts(w http.ResponseWriter, req *http.Request) {
-	logger := util_log.WithContext(req.Context(), a.logger)
-	userID, err := tenant.TenantID(req.Context())
+	logger := dslog.WithContext(req.Context(), a.logger)
+	userID, err := tenant.ID(req.Context())
 	if err != nil || userID == "" {
 		level.Error(logger).Log("msg", "error extracting org id from context", "err", err)
 		respondError(logger, w, "no valid org id found")
@@ -252,8 +252,8 @@ func (a *API) PrometheusAlerts(w http.ResponseWriter, req *http.Request) {
 			if rl.Rule.Alert != "" {
 				for _, a := range rl.Alerts {
 					alerts = append(alerts, &Alert{
-						Labels:      cortexpb.FromLabelAdaptersToLabels(a.Labels),
-						Annotations: cortexpb.FromLabelAdaptersToLabels(a.Annotations),
+						Labels:      dskitpb.FromLabelAdaptersToLabels(a.Labels),
+						Annotations: dskitpb.FromLabelAdaptersToLabels(a.Annotations),
 						State:       a.GetState(),
 						ActiveAt:    &a.ActiveAt,
 						Value:       strconv.FormatFloat(a.Value, 'e', -1, 64),
@@ -359,7 +359,7 @@ func parseGroupName(params map[string]string) (string, error) {
 // and returns them in that order. It also allows users to require a namespace or group name and return
 // an error if it they can not be parsed.
 func parseRequest(req *http.Request, requireNamespace, requireGroup bool) (string, string, string, error) {
-	userID, err := tenant.TenantID(req.Context())
+	userID, err := tenant.ID(req.Context())
 	if err != nil {
 		return "", "", "", user.ErrNoOrgID
 	}
@@ -384,7 +384,7 @@ func parseRequest(req *http.Request, requireNamespace, requireGroup bool) (strin
 }
 
 func (a *API) ListRules(w http.ResponseWriter, req *http.Request) {
-	logger := util_log.WithContext(req.Context(), a.logger)
+	logger := dslog.WithContext(req.Context(), a.logger)
 
 	userID, namespace, _, err := parseRequest(req, false, false)
 	if err != nil {
@@ -418,7 +418,7 @@ func (a *API) ListRules(w http.ResponseWriter, req *http.Request) {
 }
 
 func (a *API) GetRuleGroup(w http.ResponseWriter, req *http.Request) {
-	logger := util_log.WithContext(req.Context(), a.logger)
+	logger := dslog.WithContext(req.Context(), a.logger)
 	userID, namespace, groupName, err := parseRequest(req, true, true)
 	if err != nil {
 		respondError(logger, w, err.Error())
@@ -440,7 +440,7 @@ func (a *API) GetRuleGroup(w http.ResponseWriter, req *http.Request) {
 }
 
 func (a *API) CreateRuleGroup(w http.ResponseWriter, req *http.Request) {
-	logger := util_log.WithContext(req.Context(), a.logger)
+	logger := dslog.WithContext(req.Context(), a.logger)
 	userID, namespace, _, err := parseRequest(req, true, false)
 	if err != nil {
 		respondError(logger, w, err.Error())
@@ -509,7 +509,7 @@ func (a *API) CreateRuleGroup(w http.ResponseWriter, req *http.Request) {
 }
 
 func (a *API) DeleteNamespace(w http.ResponseWriter, req *http.Request) {
-	logger := util_log.WithContext(req.Context(), a.logger)
+	logger := dslog.WithContext(req.Context(), a.logger)
 
 	userID, namespace, _, err := parseRequest(req, true, false)
 	if err != nil {
@@ -531,7 +531,7 @@ func (a *API) DeleteNamespace(w http.ResponseWriter, req *http.Request) {
 }
 
 func (a *API) DeleteRuleGroup(w http.ResponseWriter, req *http.Request) {
-	logger := util_log.WithContext(req.Context(), a.logger)
+	logger := dslog.WithContext(req.Context(), a.logger)
 
 	userID, namespace, groupName, err := parseRequest(req, true, true)
 	if err != nil {

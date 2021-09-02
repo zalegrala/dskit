@@ -19,14 +19,14 @@ import (
 	"github.com/weaveworks/common/httpgrpc"
 	"github.com/weaveworks/common/user"
 
-	"github.com/grafana/dskit/cortexpb"
+	"github.com/grafana/dskit/dskitpb"
+	"github.com/grafana/dskit/dslog"
 	"github.com/grafana/dskit/querier"
-	util_log "github.com/grafana/dskit/util/log"
 )
 
 // Pusher is an ingester server that accepts pushes.
 type Pusher interface {
-	Push(context.Context, *cortexpb.WriteRequest) (*cortexpb.WriteResponse, error)
+	Push(context.Context, *dskitpb.WriteRequest) (*dskitpb.WriteResponse, error)
 }
 
 type PusherAppender struct {
@@ -36,7 +36,7 @@ type PusherAppender struct {
 	ctx             context.Context
 	pusher          Pusher
 	labels          []labels.Labels
-	samples         []cortexpb.Sample
+	samples         []dskitpb.Sample
 	userID          string
 	evaluationDelay time.Duration
 }
@@ -56,7 +56,7 @@ func (a *PusherAppender) Append(_ uint64, l labels.Labels, t int64, v float64) (
 		t -= a.evaluationDelay.Milliseconds()
 	}
 
-	a.samples = append(a.samples, cortexpb.Sample{
+	a.samples = append(a.samples, dskitpb.Sample{
 		TimestampMs: t,
 		Value:       v,
 	})
@@ -72,7 +72,7 @@ func (a *PusherAppender) Commit() error {
 
 	// Since a.pusher is distributor, client.ReuseSlice will be called in a.pusher.Push.
 	// We shouldn't call client.ReuseSlice here.
-	_, err := a.pusher.Push(user.InjectOrgID(a.ctx, a.userID), cortexpb.ToWriteRequest(a.labels, a.samples, nil, cortexpb.RULE))
+	_, err := a.pusher.Push(user.InjectOrgID(a.ctx, a.userID), dskitpb.ToWriteRequest(a.labels, a.samples, nil, dskitpb.RULE))
 
 	if err != nil {
 		// Don't report errors that ended with 4xx HTTP status code (series limits, duplicate samples, out of order, etc.)
@@ -196,7 +196,7 @@ func RecordAndReportRuleQueryMetrics(qf rules.QueryFunc, queryTime prometheus.Co
 				"cortex_ruler_query_seconds_total", querySeconds,
 				"query", qs,
 			}
-			level.Info(util_log.WithContext(ctx, logger)).Log(logMessage...)
+			level.Info(dslog.WithContext(ctx, logger)).Log(logMessage...)
 		}()
 
 		result, err := qf(ctx, qs, t)
