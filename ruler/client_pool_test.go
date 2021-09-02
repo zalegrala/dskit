@@ -13,7 +13,7 @@ import (
 	"github.com/weaveworks/common/user"
 	"google.golang.org/grpc"
 
-	"github.com/cortexproject/cortex/pkg/util/grpcclient"
+	"github.com/grafana/dskit/util/grpcclient"
 )
 
 func Test_newRulerClientFactory(t *testing.T) {

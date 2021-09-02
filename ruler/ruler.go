@@ -27,17 +27,17 @@ import (
 	"github.com/weaveworks/common/user"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/cortexproject/cortex/pkg/cortexpb"
-	"github.com/cortexproject/cortex/pkg/ring"
-	ring_client "github.com/cortexproject/cortex/pkg/ring/client"
-	"github.com/cortexproject/cortex/pkg/ruler/rulespb"
-	"github.com/cortexproject/cortex/pkg/ruler/rulestore"
-	"github.com/cortexproject/cortex/pkg/tenant"
-	"github.com/cortexproject/cortex/pkg/util"
-	"github.com/cortexproject/cortex/pkg/util/concurrency"
-	"github.com/cortexproject/cortex/pkg/util/grpcclient"
-	util_log "github.com/cortexproject/cortex/pkg/util/log"
-	"github.com/cortexproject/cortex/pkg/util/validation"
+	"github.com/grafana/dskit/cortexpb"
+	"github.com/grafana/dskit/ring"
+	ring_client "github.com/grafana/dskit/ring/client"
+	"github.com/grafana/dskit/ruler/rulespb"
+	"github.com/grafana/dskit/ruler/rulestore"
+	"github.com/grafana/dskit/tenant"
+	"github.com/grafana/dskit/util"
+	"github.com/grafana/dskit/util/concurrency"
+	"github.com/grafana/dskit/util/grpcclient"
+	util_log "github.com/grafana/dskit/util/log"
+	"github.com/grafana/dskit/util/validation"
 )
 
 var (

@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/cortexproject/cortex/pkg/configs/client"
-	"github.com/cortexproject/cortex/pkg/configs/userconfig"
-	"github.com/cortexproject/cortex/pkg/ruler/rulespb"
+	"github.com/grafana/dskit/configs/client"
+	"github.com/grafana/dskit/configs/userconfig"
+	"github.com/grafana/dskit/ruler/rulespb"
 )
 
 const (

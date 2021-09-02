@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
-	"github.com/cortexproject/cortex/pkg/cortexpb"
+	"github.com/grafana/dskit/cortexpb"
 )
 
 type pusherMock struct {

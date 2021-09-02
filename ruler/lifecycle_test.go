@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/cortexproject/cortex/pkg/ring"
-	"github.com/cortexproject/cortex/pkg/ring/testutils"
-	"github.com/cortexproject/cortex/pkg/util/test"
+	"github.com/grafana/dskit/ring"
+	"github.com/grafana/dskit/ring/testutils"
+	"github.com/grafana/dskit/util/test"
 )
 
 // TestRulerShutdown tests shutting down ruler unregisters correctly

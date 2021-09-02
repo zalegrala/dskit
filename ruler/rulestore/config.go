@@ -6,10 +6,10 @@ import (
 
 	"github.com/grafana/dskit/flagext"
 
-	"github.com/cortexproject/cortex/pkg/configs/client"
-	"github.com/cortexproject/cortex/pkg/ruler/rulestore/configdb"
-	"github.com/cortexproject/cortex/pkg/ruler/rulestore/local"
-	"github.com/cortexproject/cortex/pkg/storage/bucket"
+	"github.com/grafana/dskit/configs/client"
+	"github.com/grafana/dskit/ruler/rulestore/configdb"
+	"github.com/grafana/dskit/ruler/rulestore/local"
+	"github.com/grafana/dskit/storage/bucket"
 )
 
 // Config configures a rule store.

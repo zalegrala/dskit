@@ -1,4 +1,3 @@
-
 syntax = "proto3";
 
 package rules;
@@ -8,12 +7,12 @@ option go_package = "rulespb";
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/any.proto";
-import "github.com/cortexproject/cortex/pkg/cortexpb/cortex.proto";
+import "github.com/grafana/dskit/dskitpb/dskit.proto";
 
 option (gogoproto.marshaler_all) = true;
 option (gogoproto.unmarshaler_all) = true;
 
-// RuleGroupDesc is a proto representation of a cortex rule group.
+// RuleGroupDesc is a proto representation of a dskit rule group.
 message RuleGroupDesc {
   reserved 5, 7, 8;
   string name = 1;
@@ -36,12 +35,12 @@ message RuleDesc {
   string record = 2;
   string alert = 3;
   google.protobuf.Duration for = 4 [(gogoproto.nullable) = false,(gogoproto.stdduration) = true];
-  repeated cortexpb.LabelPair labels = 5 [
+  repeated dskitpb.LabelPair labels = 5 [
     (gogoproto.nullable) = false,
-    (gogoproto.customtype) = "github.com/cortexproject/cortex/pkg/cortexpb.LabelAdapter"
+    (gogoproto.customtype) = "github.com/grafana/dskit/dskitpb.LabelAdapter"
   ];
-  repeated cortexpb.LabelPair annotations = 6 [
+  repeated dskitpb.LabelPair annotations = 6 [
     (gogoproto.nullable) = false,
-    (gogoproto.customtype) = "github.com/cortexproject/cortex/pkg/cortexpb.LabelAdapter"
+    (gogoproto.customtype) = "github.com/grafana/dskit/dskitpb.LabelAdapter"
   ];
 }
