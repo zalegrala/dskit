@@ -21,7 +21,7 @@ import (
 
 	"github.com/grafana/dskit/chunk/cache"
 	"github.com/grafana/dskit/chunk/encoding"
-	"github.com/grafana/dskit/util/validation"
+	"github.com/grafana/dskit/validation"
 )
 
 type configFactory func() StoreConfig

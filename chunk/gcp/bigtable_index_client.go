@@ -16,8 +16,8 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/grafana/dskit/chunk"
-	"github.com/grafana/dskit/util/grpcclient"
-	"github.com/grafana/dskit/util/math"
+	"github.com/grafana/dskit/grpcclient"
+	"github.com/grafana/dskit/math"
 )
 
 const (

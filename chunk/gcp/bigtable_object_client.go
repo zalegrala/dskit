@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/grafana/dskit/chunk"
-	"github.com/grafana/dskit/util/math"
+	"github.com/grafana/dskit/math"
 )
 
 type bigtableObjectClient struct {

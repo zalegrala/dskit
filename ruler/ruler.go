@@ -14,10 +14,6 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/grafana/dskit/flagext"
-	"github.com/grafana/dskit/kv"
-	"github.com/grafana/dskit/services"
-	"github.com/grafana/dskit/sharding"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -28,18 +24,23 @@ import (
 	"github.com/weaveworks/common/user"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/grafana/dskit/ruler/rulespb"
-	"github.com/grafana/dskit/ruler/rulestore"
-	"github.com/grafana/dskit/tenant"
-	"github.com/grafana/dskit/util"
-	"github.com/grafana/dskit/util/concurrency"
-	"github.com/grafana/dskit/util/grpcclient"
-	"github.com/grafana/dskit/util/validation"
-
+	"github.com/grafana/dskit/concurrency"
+	"github.com/grafana/dskit/dshttp"
 	"github.com/grafana/dskit/dskitpb"
 	"github.com/grafana/dskit/dslog"
+	"github.com/grafana/dskit/flagext"
+	"github.com/grafana/dskit/grpcclient"
+	"github.com/grafana/dskit/kv"
 	"github.com/grafana/dskit/ring"
 	"github.com/grafana/dskit/ring/client"
+	"github.com/grafana/dskit/ruler/rulespb"
+	"github.com/grafana/dskit/ruler/rulestore"
+	"github.com/grafana/dskit/services"
+	"github.com/grafana/dskit/sharding"
+	"github.com/grafana/dskit/stringutil"
+	"github.com/grafana/dskit/tenant"
+	"github.com/grafana/dskit/timeutil"
+	"github.com/grafana/dskit/validation"
 )
 
 var (
@@ -125,7 +126,7 @@ type Config struct {
 
 // Validate config and returns error on failure
 func (cfg *Config) Validate(limits validation.Limits, log log.Logger) error {
-	if !util.StringsContain(supportedShardingStrategies, cfg.ShardingStrategy) {
+	if !stringutil.StringsContain(supportedShardingStrategies, cfg.ShardingStrategy) {
 		return errInvalidShardingStrategy
 	}
 
@@ -246,7 +247,7 @@ type Ruler struct {
 	ringCheckErrors prometheus.Counter
 	rulerSync       *prometheus.CounterVec
 
-	allowedTenants *util.AllowedTenants
+	allowedTenants *tenant.AllowedTenants
 
 	registry prometheus.Registerer
 	logger   log.Logger
@@ -262,7 +263,7 @@ func NewRuler(cfg Config, manager MultiTenantManager, reg prometheus.Registerer,
 		logger:         logger,
 		limits:         limits,
 		clientsPool:    newRulerClientPool(cfg.ClientTLSConfig, logger, reg),
-		allowedTenants: util.NewAllowedTenants(cfg.EnabledTenants, cfg.DisabledTenants),
+		allowedTenants: tenant.NewAllowedTenants(cfg.EnabledTenants, cfg.DisabledTenants),
 
 		ringCheckErrors: promauto.With(reg).NewCounter(prometheus.CounterOpts{
 			Name: "cortex_ruler_ring_check_errors_total",
@@ -439,7 +440,7 @@ func (r *Ruler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 					<p>Ruler running with shards disabled</p>
 				</body>
 			</html>`
-		util.WriteHTMLResponse(w, unshardedPage)
+		dshttp.WriteHTMLResponse(w, unshardedPage)
 	}
 }
 
@@ -454,7 +455,7 @@ func (r *Ruler) run(ctx context.Context) error {
 
 	if r.cfg.EnableSharding {
 		ringLastState, _ = r.ring.GetAllHealthy(RingOp)
-		ringTicker := time.NewTicker(util.DurationWithJitter(r.cfg.RingCheckPeriod, 0.2))
+		ringTicker := time.NewTicker(timeutil.DurationWithJitter(r.cfg.RingCheckPeriod, 0.2))
 		defer ringTicker.Stop()
 		ringTickerChan = ringTicker.C
 	}
@@ -868,7 +869,7 @@ func (r *Ruler) ListAllRules(w http.ResponseWriter, req *http.Request) {
 	iter := make(chan interface{})
 
 	go func() {
-		util.StreamWriteYAMLResponse(w, iter, logger)
+		dshttp.StreamWriteYAMLResponse(w, iter, logger)
 		close(done)
 	}()
 

@@ -43,7 +43,6 @@ import (
 	"github.com/grafana/dskit/ruler/rulestore"
 	"github.com/grafana/dskit/ruler/rulestore/objectclient"
 	"github.com/grafana/dskit/tenant"
-	"github.com/grafana/dskit/util"
 )
 
 func defaultRulerConfig(t testing.TB, store rulestore.RuleStore) (Config, func()) {
@@ -741,7 +740,7 @@ func TestSharding(t *testing.T) {
 
 // User shuffle shard token.
 func userToken(user string, skip int) uint32 {
-	r := rand.New(rand.NewSource(util.ShuffleShardSeed(user, "")))
+	r := rand.New(rand.NewSource(sharding.ShuffleShardSeed(user, "")))
 
 	for ; skip > 0; skip-- {
 		_ = r.Uint32()

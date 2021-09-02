@@ -20,6 +20,7 @@ import (
 	"github.com/grafana/dskit/kv"
 	"github.com/grafana/dskit/kv/consul"
 	"github.com/grafana/dskit/services"
+	"github.com/grafana/dskit/sharding"
 	"github.com/grafana/dskit/stringutil"
 	"github.com/grafana/dskit/testutil"
 )
@@ -2131,8 +2132,7 @@ func TestShuffleShardWithCaching(t *testing.T) {
 
 // User shuffle shard token.
 func userToken(user, zone string, skip int) uint32 {
-	r := rand.New(rand.NewSource(shuffleShardSeed(user, zone)))
-
+	r := rand.New(rand.NewSource(sharding.ShuffleShardSeed(user, zone)))
 	for ; skip > 0; skip-- {
 		_ = r.Uint32()
 	}

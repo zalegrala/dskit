@@ -13,7 +13,7 @@ import (
 
 	"github.com/grafana/dskit/chunk"
 	"github.com/grafana/dskit/chunk/testutils"
-	"github.com/grafana/dskit/util/validation"
+	"github.com/grafana/dskit/validation"
 )
 
 type fixture struct {

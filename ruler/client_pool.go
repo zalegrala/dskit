@@ -10,8 +10,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health/grpc_health_v1"
 
+	"github.com/grafana/dskit/grpcclient"
 	"github.com/grafana/dskit/ring/client"
-	"github.com/grafana/dskit/util/grpcclient"
 )
 
 func newRulerClientPool(clientCfg grpcclient.Config, logger log.Logger, reg prometheus.Registerer) *client.Pool {
