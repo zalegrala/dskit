@@ -35,14 +35,14 @@ import (
 	"github.com/weaveworks/common/user"
 	"gopkg.in/yaml.v2"
 
-	"github.com/cortexproject/cortex/pkg/chunk"
-	"github.com/cortexproject/cortex/pkg/cortexpb"
-	"github.com/cortexproject/cortex/pkg/ring"
-	"github.com/cortexproject/cortex/pkg/ruler/rulespb"
-	"github.com/cortexproject/cortex/pkg/ruler/rulestore"
-	"github.com/cortexproject/cortex/pkg/ruler/rulestore/objectclient"
-	"github.com/cortexproject/cortex/pkg/tenant"
-	"github.com/cortexproject/cortex/pkg/util"
+	"github.com/grafana/dskit/chunk"
+	"github.com/grafana/dskit/cortexpb"
+	"github.com/grafana/dskit/ring"
+	"github.com/grafana/dskit/ruler/rulespb"
+	"github.com/grafana/dskit/ruler/rulestore"
+	"github.com/grafana/dskit/ruler/rulestore/objectclient"
+	"github.com/grafana/dskit/tenant"
+	"github.com/grafana/dskit/util"
 )
 
 func defaultRulerConfig(t testing.TB, store rulestore.RuleStore) (Config, func()) {

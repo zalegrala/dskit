@@ -14,9 +14,9 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/cortexproject/cortex/pkg/chunk"
-	"github.com/cortexproject/cortex/pkg/ruler/rulespb"
-	"github.com/cortexproject/cortex/pkg/ruler/rulestore"
+	"github.com/grafana/dskit/chunk"
+	"github.com/grafana/dskit/ruler/rulespb"
+	"github.com/grafana/dskit/ruler/rulestore"
 )
 
 // Object Rule Storage Schema

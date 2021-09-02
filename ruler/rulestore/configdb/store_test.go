@@ -6,11 +6,11 @@ import (
 	"testing"
 	time "time"
 
-	"github.com/cortexproject/cortex/pkg/configs/userconfig"
+	"github.com/grafana/dskit/configs/userconfig"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/cortexproject/cortex/pkg/configs/client"
+	"github.com/grafana/dskit/configs/client"
 )
 
 var zeroTime time.Time

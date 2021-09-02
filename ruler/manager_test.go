@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
-	"github.com/cortexproject/cortex/pkg/ruler/rulespb"
-	"github.com/cortexproject/cortex/pkg/util/test"
+	"github.com/grafana/dskit/ruler/rulespb"
+	"github.com/grafana/dskit/util/test"
 )
 
 func TestSyncRuleGroups(t *testing.T) {

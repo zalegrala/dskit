@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cortexproject/cortex/pkg/ruler/rulespb"
-	"github.com/cortexproject/cortex/pkg/ruler/rulestore"
+	"github.com/grafana/dskit/ruler/rulespb"
+	"github.com/grafana/dskit/ruler/rulestore"
 )
 
 type mockRuleStore struct {

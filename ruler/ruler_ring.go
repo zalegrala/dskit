@@ -9,7 +9,7 @@ import (
 	"github.com/grafana/dskit/flagext"
 	"github.com/grafana/dskit/kv"
 
-	"github.com/cortexproject/cortex/pkg/ring"
+	"github.com/grafana/dskit/ring"
 )
 
 const (
