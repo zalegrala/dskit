@@ -1,12 +1,34 @@
 # put tools at the root of the folder
 PATH := $(CURDIR)/.tools/bin:$(PATH)
+#
+# Generating proto code is automated.
+PROTO_DEFS := $(shell find . $(DONT_FIND) -type f -name '*.proto' -print)
+PROTO_GOS := $(patsubst %.proto,%.pb.go,$(PROTO_DEFS))
+#
+# Manually declared dependencies
+dskitpb/dskit.pb.go: dskit/dskit.proto
+ruler/rulespb/rules.pb.go: ruler/rulespb/rules.proto
+ruler/ruler.pb.go: ruler/ruler.proto
+
+protos: $(PROTO_GOS)
+
+%.pb.go:
+	@# The store-gateway RPC is based on Thanos which uses relative references to other protos, so we need
+	@# to configure all such relative paths.
+	protoc -I $(GOPATH)/src:./$(@D) --gogoslick_out=plugins=grpc,Mgoogle/protobuf/any.proto=github.com/gogo/protobuf/types,:./$(@D) ./$(patsubst %.pb.go,%.proto,$@)
+
+check-protos: clean-protos protos
+	@git diff --exit-code -- $(PROTO_GOS)
+
+clean-protos:
+	rm -rf $(PROTO_GOS)
 
 .PHONY: test
-test:
+test: protos
 	go test -tags netgo -timeout 30m -race -count 1 ./...
 
 .PHONY: lint
-lint: .tools/bin/misspell .tools/bin/faillint .tools/bin/golangci-lint
+lint: .tools/bin/misspell .tools/bin/faillint .tools/bin/golangci-lint protos
 	misspell -error README.md CONTRIBUTING.md LICENSE
 
 	# Configured via .golangci.yml.
