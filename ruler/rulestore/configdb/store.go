@@ -48,7 +48,6 @@ func (c *ConfigRuleStore) ListAllUsers(ctx context.Context) ([]string, error) {
 // ListAllRuleGroups implements RuleStore
 func (c *ConfigRuleStore) ListAllRuleGroups(ctx context.Context) (map[string]rulespb.RuleGroupList, error) {
 	configs, err := c.configClient.GetRules(ctx, c.since)
-
 	if err != nil {
 		return nil, err
 	}
