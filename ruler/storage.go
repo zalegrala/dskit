@@ -119,7 +119,6 @@ func NewLegacyRuleStore(cfg RuleStoreConfig, loader promRules.GroupLoader, logge
 func NewRuleStore(ctx context.Context, cfg rulestore.Config, cfgProvider bucket.TenantConfigProvider, loader promRules.GroupLoader, logger log.Logger, reg prometheus.Registerer) (rulestore.RuleStore, error) {
 	if cfg.Backend == configdb.Name {
 		c, err := client.New(cfg.ConfigDB)
-
 		if err != nil {
 			return nil, err
 		}
