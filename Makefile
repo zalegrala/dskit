@@ -29,6 +29,7 @@ GOVOLUMES=	-v $(shell pwd)/.cache:/go/cache:delegated,z \
 			-v $(shell pwd)/.pkg:/go/pkg:delegated,z \
 			-v $(shell pwd):/go/src/github.com/cortexproject/cortex:delegated,z
 
+.PHONY: protos
 protos $(PROTO_GOS):
 	@mkdir -p .pkg
 	@mkdir -p .cache
@@ -38,6 +39,7 @@ protos $(PROTO_GOS):
 
 else
 
+.PHONY: protos
 protos: $(PROTO_GOS)
 
 %.pb.go:
@@ -46,15 +48,17 @@ protos: $(PROTO_GOS)
 
 endif
 
+.PHONY: check-protos
 check-protos: clean-protos protos
 	@git diff --exit-code -- $(PROTO_GOS)
 
+.PHONY: clean-protos
 clean-protos:
 	rm -rf $(PROTO_GOS)
 
 .PHONY: test
 test: protos
-	go test -tags netgo -timeout 30m -race -count 1 ./...
+	go test -tags netgo -timeout 30m -race -count 1 $(shell go list ./... | grep -v /lib/)
 
 .PHONY: lint
 lint: .tools/bin/misspell .tools/bin/faillint .tools/bin/golangci-lint protos
