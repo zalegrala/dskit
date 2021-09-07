@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -35,14 +36,16 @@ func newDeleteRequestHandlerMetrics(r prometheus.Registerer) *deleteRequestHandl
 
 // DeleteRequestHandler provides handlers for delete requests
 type DeleteRequestHandler struct {
+	logger                    log.Logger
 	deleteStore               *DeleteStore
 	metrics                   *deleteRequestHandlerMetrics
 	deleteRequestCancelPeriod time.Duration
 }
 
 // NewDeleteRequestHandler creates a DeleteRequestHandler
-func NewDeleteRequestHandler(deleteStore *DeleteStore, deleteRequestCancelPeriod time.Duration, registerer prometheus.Registerer) *DeleteRequestHandler {
+func NewDeleteRequestHandler(deleteStore *DeleteStore, deleteRequestCancelPeriod time.Duration, registerer prometheus.Registerer, logger log.Logger) *DeleteRequestHandler {
 	deleteMgr := DeleteRequestHandler{
+		logger:                    logger,
 		deleteStore:               deleteStore,
 		deleteRequestCancelPeriod: deleteRequestCancelPeriod,
 		metrics:                   newDeleteRequestHandlerMetrics(registerer),
@@ -107,7 +110,7 @@ func (dm *DeleteRequestHandler) AddDeleteRequestHandler(w http.ResponseWriter, r
 	}
 
 	if err := dm.deleteStore.AddDeleteRequest(ctx, userID, model.Time(startTime), model.Time(endTime), match); err != nil {
-		level.Error(logger).Log("msg", "error adding delete request to the store", "err", err)
+		level.Error(dm.logger).Log("msg", "error adding delete request to the store", "err", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -127,13 +130,13 @@ func (dm *DeleteRequestHandler) GetAllDeleteRequestsHandler(w http.ResponseWrite
 
 	deleteRequests, err := dm.deleteStore.GetAllDeleteRequestsForUser(ctx, userID)
 	if err != nil {
-		level.Error(logger).Log("msg", "error getting delete requests from the store", "err", err)
+		level.Error(dm.logger).Log("msg", "error getting delete requests from the store", "err", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	if err := json.NewEncoder(w).Encode(deleteRequests); err != nil {
-		level.Error(logger).Log("msg", "error marshalling response", "err", err)
+		level.Error(dm.logger).Log("msg", "error marshalling response", "err", err)
 		http.Error(w, fmt.Sprintf("Error marshalling response: %v", err), http.StatusInternalServerError)
 	}
 }
@@ -152,7 +155,7 @@ func (dm *DeleteRequestHandler) CancelDeleteRequestHandler(w http.ResponseWriter
 
 	deleteRequest, err := dm.deleteStore.GetDeleteRequest(ctx, userID, requestID)
 	if err != nil {
-		level.Error(logger).Log("msg", "error getting delete request from the store", "err", err)
+		level.Error(dm.logger).Log("msg", "error getting delete request from the store", "err", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -173,7 +176,7 @@ func (dm *DeleteRequestHandler) CancelDeleteRequestHandler(w http.ResponseWriter
 	}
 
 	if err := dm.deleteStore.RemoveDeleteRequest(ctx, userID, requestID, deleteRequest.CreatedAt, deleteRequest.StartTime, deleteRequest.EndTime); err != nil {
-		level.Error(logger).Log("msg", "error cancelling the delete request", "err", err)
+		level.Error(dm.logger).Log("msg", "error cancelling the delete request", "err", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

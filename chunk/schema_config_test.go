@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-kit/kit/log"
 	"github.com/prometheus/common/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -603,7 +604,7 @@ func TestSchemaConfig_Validate(t *testing.T) {
 		testData := testData
 
 		t.Run(testName, func(t *testing.T) {
-			actual := testData.config.Validate()
+			actual := testData.config.Validate(log.NewNopLogger())
 			assert.Equal(t, testData.err, actual)
 			if testData.expected != nil {
 				require.Equal(t, testData.expected, testData.config)
@@ -670,9 +671,9 @@ func TestPeriodConfig_Validate(t *testing.T) {
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			if tc.err == "" {
-				require.Nil(t, tc.in.validate())
+				require.Nil(t, tc.in.validate(log.NewNopLogger()))
 			} else {
-				require.Error(t, tc.in.validate(), tc.err)
+				require.Error(t, tc.in.validate(log.NewNopLogger()), tc.err)
 			}
 		})
 	}

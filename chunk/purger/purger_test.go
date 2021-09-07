@@ -9,15 +9,16 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
-	"github.com/grafana/dskit/flagext"
-	"github.com/grafana/dskit/services"
 	"github.com/prometheus/client_golang/prometheus"
+	ptestutil "github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/promql/parser"
 	"github.com/stretchr/testify/require"
 
 	"github.com/grafana/dskit/chunk"
 	"github.com/grafana/dskit/chunk/testutils"
+	"github.com/grafana/dskit/flagext"
+	"github.com/grafana/dskit/services"
 	"github.com/grafana/dskit/testutil"
 )
 
@@ -31,15 +32,15 @@ func setupTestDeleteStore(t *testing.T) *DeleteStore {
 	var (
 		deleteStoreConfig DeleteStoreConfig
 		tbmConfig         chunk.TableManagerConfig
-		schemaCfg         = chunk.DefaultSchemaConfig("", "v10", 0)
+		schemaCfg         = chunk.DefaultSchemaConfig("", "v10", 0, log.NewNopLogger())
 	)
 	flagext.DefaultValues(&deleteStoreConfig)
 	flagext.DefaultValues(&tbmConfig)
 
-	mockStorage := chunk.NewMockStorage()
+	mockStorage := chunk.NewMockStorage(log.NewNopLogger())
 
 	extraTables := []chunk.ExtraTables{{TableClient: mockStorage, Tables: deleteStoreConfig.GetTables()}}
-	tableManager, err := chunk.NewTableManager(tbmConfig, schemaCfg, 12*time.Hour, mockStorage, nil, extraTables, nil)
+	tableManager, err := chunk.NewTableManager(tbmConfig, schemaCfg, 12*time.Hour, mockStorage, nil, extraTables, nil, log.NewNopLogger())
 	require.NoError(t, err)
 
 	require.NoError(t, tableManager.SyncTables(context.Background()))
@@ -70,7 +71,7 @@ func setupPurger(t *testing.T, deleteStore *DeleteStore, chunkStore chunk.Store,
 	var cfg Config
 	flagext.DefaultValues(&cfg)
 
-	purger, err := NewPurger(cfg, deleteStore, chunkStore, storageClient, registry)
+	purger, err := NewPurger(cfg, deleteStore, chunkStore, storageClient, registry, log.NewNopLogger())
 	require.NoError(t, err)
 
 	return purger, registry
@@ -248,7 +249,7 @@ func TestPurger_BuildPlan(t *testing.T) {
 				}
 
 				require.Equal(t, tc.numChunksToDelete*batchSize, len(chunkIDs))
-				require.Equal(t, float64(tc.numChunksToDelete*batchSize), testutil.ToFloat64(purger.metrics.deleteRequestsChunksSelectedTotal))
+				require.Equal(t, float64(tc.numChunksToDelete*batchSize), ptestutil.ToFloat64(purger.metrics.deleteRequestsChunksSelectedTotal))
 			})
 		}
 	}
@@ -374,9 +375,9 @@ func TestPurger_Restarts(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusProcessed, deleteRequests[0].Status)
 
-	require.Equal(t, float64(1), testutil.ToFloat64(newPurger.metrics.deleteRequestsProcessedTotal))
+	require.Equal(t, float64(1), ptestutil.ToFloat64(newPurger.metrics.deleteRequestsProcessedTotal))
 	require.PanicsWithError(t, "collected 0 metrics instead of exactly 1", func() {
-		testutil.ToFloat64(newPurger.metrics.deleteRequestsProcessingFailures)
+		ptestutil.ToFloat64(newPurger.metrics.deleteRequestsProcessingFailures)
 	})
 }
 
@@ -407,8 +408,8 @@ func TestPurger_Metrics(t *testing.T) {
 	require.NoError(t, purger.pullDeleteRequestsToPlanDeletes())
 
 	// there must be 2 pending delete requests, oldest being 2 days old since its cancellation time is over
-	require.InDelta(t, float64(2*86400), testutil.ToFloat64(purger.metrics.oldestPendingDeleteRequestAgeSeconds), 1)
-	require.Equal(t, float64(2), testutil.ToFloat64(purger.metrics.pendingDeleteRequestsCount))
+	require.InDelta(t, float64(2*86400), ptestutil.ToFloat64(purger.metrics.oldestPendingDeleteRequestAgeSeconds), 1)
+	require.Equal(t, float64(2), ptestutil.ToFloat64(purger.metrics.pendingDeleteRequestsCount))
 
 	// stop the existing purger
 	require.NoError(t, services.StopAndAwaitTerminated(context.Background(), purger))
@@ -423,38 +424,38 @@ func TestPurger_Metrics(t *testing.T) {
 
 	// wait until purger_delete_requests_processed_total starts to show up.
 	testutil.Poll(t, 2*time.Second, 1, func() interface{} {
-		count, err := testutil.GatherAndCount(registry, "cortex_purger_delete_requests_processed_total")
+		count, err := ptestutil.GatherAndCount(registry, "cortex_purger_delete_requests_processed_total")
 		require.NoError(t, err)
 		return count
 	})
 
 	// wait until both the pending delete requests are processed.
 	testutil.Poll(t, 2*time.Second, float64(2), func() interface{} {
-		return testutil.ToFloat64(purger.metrics.deleteRequestsProcessedTotal)
+		return ptestutil.ToFloat64(purger.metrics.deleteRequestsProcessedTotal)
 	})
 
 	// wait until oldest pending request age becomes 0
 	testutil.Poll(t, 2*time.Second, float64(0), func() interface{} {
-		return testutil.ToFloat64(purger.metrics.oldestPendingDeleteRequestAgeSeconds)
+		return ptestutil.ToFloat64(purger.metrics.oldestPendingDeleteRequestAgeSeconds)
 	})
 
 	// wait until pending delete requests count becomes 0
 	testutil.Poll(t, 2*time.Second, float64(0), func() interface{} {
-		return testutil.ToFloat64(purger.metrics.pendingDeleteRequestsCount)
+		return ptestutil.ToFloat64(purger.metrics.pendingDeleteRequestsCount)
 	})
 }
 
 func TestPurger_retryFailedRequests(t *testing.T) {
 	// setup chunks store
-	indexMockStorage := chunk.NewMockStorage()
-	chunksMockStorage := chunk.NewMockStorage()
+	indexMockStorage := chunk.NewMockStorage(log.NewNopLogger())
+	chunksMockStorage := chunk.NewMockStorage(log.NewNopLogger())
 
 	deleteStore := setupTestDeleteStore(t)
 	chunkStore, err := testutils.SetupTestChunkStoreWithClients(indexMockStorage, chunksMockStorage, indexMockStorage)
 	require.NoError(t, err)
 
 	// create a purger instance
-	purgerMockStorage := chunk.NewMockStorage()
+	purgerMockStorage := chunk.NewMockStorage(log.NewNopLogger())
 	purger, _ := setupPurger(t, deleteStore, chunkStore, purgerMockStorage)
 	require.NoError(t, services.StartAndAwaitRunning(context.Background(), purger))
 

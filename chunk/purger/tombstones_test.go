@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-kit/kit/log"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/promql/parser"
 	"github.com/stretchr/testify/assert"
@@ -97,7 +98,7 @@ func TestTombstonesLoader(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			deleteStore := setupTestDeleteStore(t)
-			tombstonesLoader := NewTombstonesLoader(deleteStore, nil)
+			tombstonesLoader := NewTombstonesLoader(deleteStore, nil, log.NewNopLogger())
 
 			// add delete requests
 			for _, interval := range tc.deleteRequestIntervals {
@@ -155,7 +156,7 @@ func TestTombstonesLoader_GetCacheGenNumber(t *testing.T) {
 			},
 		},
 	}
-	tombstonesLoader := NewTombstonesLoader(s, nil)
+	tombstonesLoader := NewTombstonesLoader(s, nil, log.NewNopLogger())
 
 	for _, tc := range []struct {
 		name                          string
@@ -200,7 +201,7 @@ func TestTombstonesLoader_GetCacheGenNumber(t *testing.T) {
 
 func TestTombstonesReloadDoesntDeadlockOnFailure(t *testing.T) {
 	s := &store{}
-	tombstonesLoader := NewTombstonesLoader(s, nil)
+	tombstonesLoader := NewTombstonesLoader(s, nil, log.NewNopLogger())
 	tombstonesLoader.getCacheGenNumbers("test")
 
 	s.err = errors.New("error")

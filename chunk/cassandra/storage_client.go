@@ -104,7 +104,7 @@ func (cfg *Config) Validate() error {
 	return nil
 }
 
-func (cfg *Config) session(name string, reg prometheus.Registerer) (*gocql.Session, error) {
+func (cfg *Config) session(name string, reg prometheus.Registerer, logger log.Logger) (*gocql.Session, error) {
 	cluster := gocql.NewCluster(strings.Split(cfg.Addresses, ",")...)
 	cluster.Port = cfg.Port
 	cluster.Keyspace = cfg.Keyspace
@@ -125,7 +125,7 @@ func (cfg *Config) session(name string, reg prometheus.Registerer) (*gocql.Sessi
 		}
 	}
 	if !cfg.ConvictHosts {
-		cluster.ConvictionPolicy = noopConvictionPolicy{}
+		cluster.ConvictionPolicy = noopConvictionPolicy{logger}
 	}
 	if err := cfg.setClusterConfig(cluster); err != nil {
 		return nil, errors.WithStack(err)
@@ -258,13 +258,13 @@ type StorageClient struct {
 }
 
 // NewStorageClient returns a new StorageClient.
-func NewStorageClient(cfg Config, schemaCfg chunk.SchemaConfig, registerer prometheus.Registerer) (*StorageClient, error) {
-	readSession, err := cfg.session("index-read", registerer)
+func NewStorageClient(cfg Config, schemaCfg chunk.SchemaConfig, registerer prometheus.Registerer, logger log.Logger) (*StorageClient, error) {
+	readSession, err := cfg.session("index-read", registerer, logger)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	writeSession, err := cfg.session("index-write", registerer)
+	writeSession, err := cfg.session("index-write", registerer, logger)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -446,13 +446,13 @@ type ObjectClient struct {
 }
 
 // NewObjectClient returns a new ObjectClient.
-func NewObjectClient(cfg Config, schemaCfg chunk.SchemaConfig, registerer prometheus.Registerer) (*ObjectClient, error) {
-	readSession, err := cfg.session("chunks-read", registerer)
+func NewObjectClient(cfg Config, schemaCfg chunk.SchemaConfig, registerer prometheus.Registerer, logger log.Logger) (*ObjectClient, error) {
+	readSession, err := cfg.session("chunks-read", registerer, logger)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	writeSession, err := cfg.session("chunks-write", registerer)
+	writeSession, err := cfg.session("chunks-write", registerer, logger)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -549,13 +549,13 @@ func (s *ObjectClient) Stop() {
 	s.writeSession.Close()
 }
 
-type noopConvictionPolicy struct{}
+type noopConvictionPolicy struct{ logger log.Logger }
 
 // AddFailure should return `true` if the host should be convicted, `false` otherwise.
 // Convicted means connections are removed - we don't want that.
 // Implementats gocql.ConvictionPolicy.
-func (noopConvictionPolicy) AddFailure(err error, host *gocql.HostInfo) bool {
-	level.Error(logger).Log("msg", "Cassandra host failure", "err", err, "host", host.String())
+func (p noopConvictionPolicy) AddFailure(err error, host *gocql.HostInfo) bool {
+	level.Error(p.logger).Log("msg", "Cassandra host failure", "err", err, "host", host.String())
 	return false
 }
 

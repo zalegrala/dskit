@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-kit/log"
 	"github.com/pkg/errors"
 	promV1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
@@ -126,12 +127,14 @@ func test(t *testing.T, client dynamoTableClient, tableManager *chunk.TableManag
 }
 
 func TestTableManagerMetricsAutoScaling(t *testing.T) {
-	dynamoDB := newMockDynamoDB(0, 0)
+	dynamoDB := newMockDynamoDB(0, 0, log.NewNopLogger())
 	mockProm := mockPrometheus{}
 
 	client := dynamoTableClient{
+		logger:   log.NewNopLogger(),
 		DynamoDB: dynamoDB,
 		autoscale: &metricsData{
+			logger:  log.NewNopLogger(),
 			promAPI: &mockProm,
 			cfg: MetricsAutoScalingConfig{
 				TargetQueueLen: 100000,
@@ -171,7 +174,7 @@ func TestTableManagerMetricsAutoScaling(t *testing.T) {
 		ChunkTables:         fixtureProvisionConfig(2, chunkWriteScale, inactiveWriteScale),
 	}
 
-	tableManager, err := chunk.NewTableManager(tbm, cfg, maxChunkAge, client, nil, nil, nil)
+	tableManager, err := chunk.NewTableManager(tbm, cfg, maxChunkAge, client, nil, nil, nil, log.NewNopLogger())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,12 +289,14 @@ func TestTableManagerMetricsAutoScaling(t *testing.T) {
 }
 
 func TestTableManagerMetricsReadAutoScaling(t *testing.T) {
-	dynamoDB := newMockDynamoDB(0, 0)
+	dynamoDB := newMockDynamoDB(0, 0, log.NewNopLogger())
 	mockProm := mockPrometheus{}
 
 	client := dynamoTableClient{
+		logger:   log.NewNopLogger(),
 		DynamoDB: dynamoDB,
 		autoscale: &metricsData{
+			logger:  log.NewNopLogger(),
 			promAPI: &mockProm,
 			cfg: MetricsAutoScalingConfig{
 				TargetQueueLen: 100000,
@@ -330,7 +335,7 @@ func TestTableManagerMetricsReadAutoScaling(t *testing.T) {
 		ChunkTables:         fixtureReadProvisionConfig(chunkReadScale, inactiveReadScale),
 	}
 
-	tableManager, err := chunk.NewTableManager(tbm, cfg, maxChunkAge, client, nil, nil, nil)
+	tableManager, err := chunk.NewTableManager(tbm, cfg, maxChunkAge, client, nil, nil, nil, log.NewNopLogger())
 	if err != nil {
 		t.Fatal(err)
 	}
