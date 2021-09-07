@@ -12,7 +12,7 @@ import (
 	"github.com/grafana/dskit/services"
 	"github.com/oklog/ulid"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/testutil"
+	ptestutil "github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -44,7 +44,7 @@ func TestLoader_GetIndex_ShouldLazyLoadBucketIndex(t *testing.T) {
 	})
 
 	// Ensure no index has been loaded yet.
-	assert.NoError(t, testutil.GatherAndCompare(reg, bytes.NewBufferString(`
+	assert.NoError(t, ptestutil.GatherAndCompare(reg, bytes.NewBufferString(`
 		# HELP dsbucket_index_load_failures_total Total number of bucket index loading failures.
 		# TYPE dsbucket_index_load_failures_total counter
 		dsbucket_index_load_failures_total 0
@@ -68,7 +68,7 @@ func TestLoader_GetIndex_ShouldLazyLoadBucketIndex(t *testing.T) {
 	}
 
 	// Ensure metrics have been updated accordingly.
-	assert.NoError(t, testutil.GatherAndCompare(reg, bytes.NewBufferString(`
+	assert.NoError(t, ptestutil.GatherAndCompare(reg, bytes.NewBufferString(`
 		# HELP dsbucket_index_load_failures_total Total number of bucket index loading failures.
 		# TYPE dsbucket_index_load_failures_total counter
 		dsbucket_index_load_failures_total 0
@@ -107,7 +107,7 @@ func TestLoader_GetIndex_ShouldCacheError(t *testing.T) {
 	}
 
 	// Ensure metrics have been updated accordingly.
-	assert.NoError(t, testutil.GatherAndCompare(reg, bytes.NewBufferString(`
+	assert.NoError(t, ptestutil.GatherAndCompare(reg, bytes.NewBufferString(`
 		# HELP dsbucket_index_load_failures_total Total number of bucket index loading failures.
 		# TYPE dsbucket_index_load_failures_total counter
 		dsbucket_index_load_failures_total 1
@@ -143,7 +143,7 @@ func TestLoader_GetIndex_ShouldCacheIndexNotFoundError(t *testing.T) {
 	}
 
 	// Ensure metrics have been updated accordingly.
-	assert.NoError(t, testutil.GatherAndCompare(reg, bytes.NewBufferString(`
+	assert.NoError(t, ptestutil.GatherAndCompare(reg, bytes.NewBufferString(`
 		# HELP dsbucket_index_load_failures_total Total number of bucket index loading failures.
 		# TYPE dsbucket_index_load_failures_total counter
 		dsbucket_index_load_failures_total 0
@@ -212,7 +212,7 @@ func TestLoader_ShouldUpdateIndexInBackgroundOnPreviousLoadSuccess(t *testing.T)
 	assert.Equal(t, idx, actualIdx)
 
 	// Ensure metrics have been updated accordingly.
-	assert.NoError(t, testutil.GatherAndCompare(reg, bytes.NewBufferString(`
+	assert.NoError(t, ptestutil.GatherAndCompare(reg, bytes.NewBufferString(`
 		# HELP dsbucket_index_load_failures_total Total number of bucket index loading failures.
 		# TYPE dsbucket_index_load_failures_total counter
 		dsbucket_index_load_failures_total 0
@@ -272,7 +272,7 @@ func TestLoader_ShouldUpdateIndexInBackgroundOnPreviousLoadFailure(t *testing.T)
 	assert.Equal(t, idx, actualIdx)
 
 	// Ensure metrics have been updated accordingly.
-	assert.NoError(t, testutil.GatherAndCompare(reg, bytes.NewBufferString(`
+	assert.NoError(t, ptestutil.GatherAndCompare(reg, bytes.NewBufferString(`
 		# HELP dsbucket_index_loaded Number of bucket indexes currently loaded in-memory.
 		# TYPE dsbucket_index_loaded gauge
 		dsbucket_index_loaded 1
@@ -325,7 +325,7 @@ func TestLoader_ShouldUpdateIndexInBackgroundOnPreviousIndexNotFound(t *testing.
 	assert.Equal(t, idx, actualIdx)
 
 	// Ensure metrics have been updated accordingly.
-	assert.NoError(t, testutil.GatherAndCompare(reg, bytes.NewBufferString(`
+	assert.NoError(t, ptestutil.GatherAndCompare(reg, bytes.NewBufferString(`
 		# HELP dsbucket_index_loaded Number of bucket indexes currently loaded in-memory.
 		# TYPE dsbucket_index_loaded gauge
 		dsbucket_index_loaded 1
@@ -373,7 +373,7 @@ func TestLoader_ShouldNotCacheCriticalErrorOnBackgroundUpdates(t *testing.T) {
 
 	// Wait until the first failure has been tracked.
 	testutil.Poll(t, 3*time.Second, true, func() interface{} {
-		return testutil.ToFloat64(loader.loadFailures) > 0
+		return ptestutil.ToFloat64(loader.loadFailures) > 0
 	})
 
 	actualIdx, err = loader.GetIndex(ctx, "user-1")
@@ -381,7 +381,7 @@ func TestLoader_ShouldNotCacheCriticalErrorOnBackgroundUpdates(t *testing.T) {
 	assert.Equal(t, idx, actualIdx)
 
 	// Ensure metrics have been updated accordingly.
-	assert.NoError(t, testutil.GatherAndCompare(reg, bytes.NewBufferString(`
+	assert.NoError(t, ptestutil.GatherAndCompare(reg, bytes.NewBufferString(`
 		# HELP dsbucket_index_loaded Number of bucket indexes currently loaded in-memory.
 		# TYPE dsbucket_index_loaded gauge
 		dsbucket_index_loaded 1
@@ -428,13 +428,13 @@ func TestLoader_ShouldCacheIndexNotFoundOnBackgroundUpdates(t *testing.T) {
 	require.NoError(t, DeleteIndex(ctx, bkt, "user-1", nil))
 
 	// Wait until the next index load attempt occurs.
-	prevLoads := testutil.ToFloat64(loader.loadAttempts)
+	prevLoads := ptestutil.ToFloat64(loader.loadAttempts)
 	testutil.Poll(t, 3*time.Second, true, func() interface{} {
-		return testutil.ToFloat64(loader.loadAttempts) > prevLoads
+		return ptestutil.ToFloat64(loader.loadAttempts) > prevLoads
 	})
 
 	// We expect the bucket index is not considered loaded because of the error.
-	assert.NoError(t, testutil.GatherAndCompare(reg, bytes.NewBufferString(`
+	assert.NoError(t, ptestutil.GatherAndCompare(reg, bytes.NewBufferString(`
 			# HELP dsbucket_index_loaded Number of bucket indexes currently loaded in-memory.
 			# TYPE dsbucket_index_loaded gauge
 			dsbucket_index_loaded 0
@@ -443,11 +443,11 @@ func TestLoader_ShouldCacheIndexNotFoundOnBackgroundUpdates(t *testing.T) {
 	))
 
 	// Try to get the index again. We expect no load attempt because the error has been cached.
-	prevLoads = testutil.ToFloat64(loader.loadAttempts)
+	prevLoads = ptestutil.ToFloat64(loader.loadAttempts)
 	actualIdx, err = loader.GetIndex(ctx, "user-1")
 	assert.Equal(t, ErrIndexNotFound, err)
 	assert.Nil(t, actualIdx)
-	assert.Equal(t, prevLoads, testutil.ToFloat64(loader.loadAttempts))
+	assert.Equal(t, prevLoads, ptestutil.ToFloat64(loader.loadAttempts))
 }
 
 func TestLoader_ShouldOffloadIndexIfNotFoundDuringBackgroundUpdates(t *testing.T) {
@@ -489,14 +489,14 @@ func TestLoader_ShouldOffloadIndexIfNotFoundDuringBackgroundUpdates(t *testing.T
 
 	// Wait until the index is offloaded.
 	testutil.Poll(t, 3*time.Second, float64(0), func() interface{} {
-		return testutil.ToFloat64(loader.loaded)
+		return ptestutil.ToFloat64(loader.loaded)
 	})
 
 	_, err = loader.GetIndex(ctx, "user-1")
 	require.Equal(t, ErrIndexNotFound, err)
 
 	// Ensure metrics have been updated accordingly.
-	assert.NoError(t, testutil.GatherAndCompare(reg, bytes.NewBufferString(`
+	assert.NoError(t, ptestutil.GatherAndCompare(reg, bytes.NewBufferString(`
 		# HELP dsbucket_index_loaded Number of bucket indexes currently loaded in-memory.
 		# TYPE dsbucket_index_loaded gauge
 		dsbucket_index_loaded 0
@@ -541,11 +541,11 @@ func TestLoader_ShouldOffloadIndexIfIdleTimeoutIsReachedDuringBackgroundUpdates(
 
 	// Wait until the index is offloaded.
 	testutil.Poll(t, 3*time.Second, float64(0), func() interface{} {
-		return testutil.ToFloat64(loader.loaded)
+		return ptestutil.ToFloat64(loader.loaded)
 	})
 
 	// Ensure metrics have been updated accordingly.
-	assert.NoError(t, testutil.GatherAndCompare(reg, bytes.NewBufferString(`
+	assert.NoError(t, ptestutil.GatherAndCompare(reg, bytes.NewBufferString(`
 		# HELP dsbucket_index_loaded Number of bucket indexes currently loaded in-memory.
 		# TYPE dsbucket_index_loaded gauge
 		dsbucket_index_loaded 0
@@ -563,7 +563,7 @@ func TestLoader_ShouldOffloadIndexIfIdleTimeoutIsReachedDuringBackgroundUpdates(
 	assert.Equal(t, idx, actualIdx)
 
 	// Ensure metrics have been updated accordingly.
-	assert.NoError(t, testutil.GatherAndCompare(reg, bytes.NewBufferString(`
+	assert.NoError(t, ptestutil.GatherAndCompare(reg, bytes.NewBufferString(`
 		# HELP dsbucket_index_loads_total Total number of bucket index loading attempts.
 		# TYPE dsbucket_index_loads_total counter
 		dsbucket_index_loads_total 2
