@@ -28,10 +28,10 @@ func TestRulerShutdown(t *testing.T) {
 	defer rcleanup()
 
 	r.cfg.EnableSharding = true
-	ringStore, closer := consul.NewInMemoryClient(ring.GetCodec(), log.NewNopLogger())
+	ringStore, closer := consul.NewInMemoryClient(ring.GetCodec(), log.NewNopLogger(), nil)
 	t.Cleanup(func() { assert.NoError(t, closer.Close()) })
 
-	err := enableSharding(r, ringStore)
+	err := enableSharding(r, ringStore, log.NewNopLogger())
 	require.NoError(t, err)
 
 	require.NoError(t, services.StartAndAwaitRunning(ctx, r))
@@ -39,7 +39,7 @@ func TestRulerShutdown(t *testing.T) {
 
 	// Wait until the tokens are registered in the ring
 	testutil.Poll(t, 100*time.Millisecond, config.Ring.NumTokens, func() interface{} {
-		return testutils.NumTokens(ringStore, "localhost", ring.RulerRingKey)
+		return testutils.NumTokens(ringStore, "localhost", ring.RulerRingKey, log.NewNopLogger())
 	})
 
 	require.Equal(t, ring.ACTIVE, r.lifecycler.GetState())
@@ -48,7 +48,7 @@ func TestRulerShutdown(t *testing.T) {
 
 	// Wait until the tokens are unregistered from the ring
 	testutil.Poll(t, 100*time.Millisecond, 0, func() interface{} {
-		return testutils.NumTokens(ringStore, "localhost", ring.RulerRingKey)
+		return testutils.NumTokens(ringStore, "localhost", ring.RulerRingKey, log.NewNopLogger())
 	})
 }
 
@@ -65,10 +65,10 @@ func TestRuler_RingLifecyclerShouldAutoForgetUnhealthyInstances(t *testing.T) {
 	r.cfg.Ring.HeartbeatPeriod = 100 * time.Millisecond
 	r.cfg.Ring.HeartbeatTimeout = heartbeatTimeout
 
-	ringStore, closer := consul.NewInMemoryClient(ring.GetCodec(), log.NewNopLogger())
+	ringStore, closer := consul.NewInMemoryClient(ring.GetCodec(), log.NewNopLogger(), nil)
 	t.Cleanup(func() { assert.NoError(t, closer.Close()) })
 
-	err := enableSharding(r, ringStore)
+	err := enableSharding(r, ringStore, log.NewNopLogger())
 	require.NoError(t, err)
 
 	require.NoError(t, services.StartAndAwaitRunning(ctx, r))

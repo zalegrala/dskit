@@ -232,7 +232,7 @@ func TestDelete(t *testing.T) {
 }
 
 func runForEachRuleStore(t *testing.T, testFn func(t *testing.T, store rulestore.RuleStore, bucketClient interface{})) {
-	legacyClient := chunk.NewMockStorage()
+	legacyClient := chunk.NewMockStorage(log.NewNopLogger())
 	legacyStore := objectclient.NewRuleStore(legacyClient, 5, log.NewNopLogger())
 
 	bucketClient := objstore.NewInMemBucket()
