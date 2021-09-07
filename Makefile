@@ -22,6 +22,7 @@ kv/memberlist/kv.pb.go: kv/memberlist/kv.proto
 chunk/grpc/grpc.pb.go: chunk/grpc/grpc.proto
 chunk/storage/caching_index_client.pb.go: chunk/storage/caching_index_client.proto
 chunk/purger/delete_plan.pb.go: chunk/purger/delete_plan.proto
+querier/queryrange/queryrange.pb.go: querier/queryrange/queryrange.proto
 
 ifeq ($(BUILD_IN_CONTAINER),true)
 
