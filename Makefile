@@ -43,8 +43,7 @@ else
 protos: $(PROTO_GOS)
 
 %.pb.go:
-	pwd
-	protoc -I $(GOPATH)/src:./lib/github.com/gogo/protobuf:./lib:./:./$(@D) --gogoslick_out=plugins=grpc,Mgoogle/protobuf/any.proto=github.com/gogo/protobuf/types,:./ ./$(patsubst %.pb.go,%.proto,$@)
+	protoc -I $(GOPATH)/src:./lib/github.com/gogo/protobuf:./lib:./:./$(@D) --gogoslick_out=plugins=grpc,Mgoogle/protobuf/any.proto=github.com/gogo/protobuf/types,:./$(@D) ./$(patsubst %.pb.go,%.proto,$@)
 
 endif
 
