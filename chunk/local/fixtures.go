@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/go-kit/kit/log"
 	"github.com/prometheus/common/model"
 
 	"github.com/grafana/dskit/chunk"
@@ -14,6 +15,7 @@ import (
 )
 
 type fixture struct {
+	logger  log.Logger
 	name    string
 	dirname string
 }
@@ -33,12 +35,12 @@ func (f *fixture) Clients() (
 
 	indexClient, err = NewBoltDBIndexClient(BoltDBConfig{
 		Directory: f.dirname,
-	})
+	}, f.logger)
 	if err != nil {
 		return
 	}
 
-	oClient, err := NewFSObjectClient(FSConfig{Directory: f.dirname})
+	oClient, err := NewFSObjectClient(FSConfig{Directory: f.dirname}, f.logger)
 	if err != nil {
 		return
 	}
@@ -75,6 +77,7 @@ func (f *fixture) Clients() (
 // Fixtures for unit testing GCP storage.
 var Fixtures = []testutils.Fixture{
 	&fixture{
-		name: "boltdb",
+		logger: log.NewNopLogger(),
+		name:   "boltdb",
 	},
 }

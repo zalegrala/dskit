@@ -127,7 +127,7 @@ func testChunkFetcher(t *testing.T, c cache.Cache, keys []string, chunks []chunk
 
 // testChunkFetcherStop checks that stopping the fetcher while fetching chunks don't result an error
 func testChunkFetcherStop(t *testing.T, c cache.Cache, keys []string, chunks []chunk.Chunk) {
-	fetcher, err := chunk.NewChunkFetcher(c, false, chunk.NewMockStorage())
+	fetcher, err := chunk.NewChunkFetcher(c, false, chunk.NewMockStorage(log.NewNopLogger()))
 	require.NoError(t, err)
 
 	done := make(chan struct{})

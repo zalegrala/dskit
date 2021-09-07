@@ -53,7 +53,7 @@ type customBoltDBIndexClient struct {
 }
 
 func newBoltDBCustomIndexClient(cfg local.BoltDBConfig) (chunk.IndexClient, error) {
-	boltdbClient, err := local.NewBoltDBIndexClient(cfg)
+	boltdbClient, err := local.NewBoltDBIndexClient(cfg, log.NewNopLogger())
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func TestCustomIndexClient(t *testing.T) {
 			RegisterIndexStore(tc.indexClientName, tc.indexClientFactories.indexClientFactoryFunc, tc.indexClientFactories.tableClientFactoryFunc)
 		}
 
-		indexClient, err := NewIndexClient(tc.indexClientName, cfg, schemaCfg, nil)
+		indexClient, err := NewIndexClient(tc.indexClientName, cfg, schemaCfg, nil, log.NewNopLogger())
 		if tc.errorExpected {
 			require.Error(t, err)
 		} else {
@@ -146,7 +146,7 @@ func TestCustomIndexClient(t *testing.T) {
 			require.Equal(t, tc.expectedIndexClientType, reflect.TypeOf(indexClient))
 		}
 
-		tableClient, err := NewTableClient(tc.indexClientName, cfg, nil)
+		tableClient, err := NewTableClient(tc.indexClientName, cfg, nil, log.NewNopLogger())
 		if tc.errorExpected {
 			require.Error(t, err)
 		} else {
@@ -172,7 +172,7 @@ func TestCassandraInMultipleSchemas(t *testing.T) {
 	cassandraCfg.ReplicationFactor = 1
 
 	// build schema with cassandra in multiple periodic configs
-	schemaCfg := chunk.DefaultSchemaConfig("cassandra", "v1", model.Now().Add(-7*24*time.Hour))
+	schemaCfg := chunk.DefaultSchemaConfig("cassandra", "v1", model.Now().Add(-7*24*time.Hour), log.NewNopLogger())
 	newSchemaCfg := schemaCfg.Configs[0]
 	newSchemaCfg.Schema = "v2"
 	newSchemaCfg.From = chunk.DayTime{Time: model.Now()}

@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"go.etcd.io/bbolt"
 
@@ -47,6 +48,7 @@ func (cfg *BoltDBConfig) RegisterFlags(f *flag.FlagSet) {
 type BoltIndexClient struct {
 	cfg BoltDBConfig
 
+	logger log.Logger
 	dbsMtx sync.RWMutex
 	dbs    map[string]*bbolt.DB
 	done   chan struct{}
@@ -54,15 +56,16 @@ type BoltIndexClient struct {
 }
 
 // NewBoltDBIndexClient creates a new IndexClient that used BoltDB.
-func NewBoltDBIndexClient(cfg BoltDBConfig) (*BoltIndexClient, error) {
+func NewBoltDBIndexClient(cfg BoltDBConfig, logger log.Logger) (*BoltIndexClient, error) {
 	if err := chunkfs.EnsureDirectory(cfg.Directory); err != nil {
 		return nil, err
 	}
 
 	indexClient := &BoltIndexClient{
-		cfg:  cfg,
-		dbs:  map[string]*bbolt.DB{},
-		done: make(chan struct{}),
+		cfg:    cfg,
+		logger: logger,
+		dbs:    map[string]*bbolt.DB{},
+		done:   make(chan struct{}),
 	}
 
 	indexClient.wait.Add(1)
@@ -93,7 +96,7 @@ func (b *BoltIndexClient) reload() {
 	for name := range b.dbs {
 		if _, err := os.Stat(path.Join(b.cfg.Directory, name)); err != nil && os.IsNotExist(err) {
 			removedDBs = append(removedDBs, name)
-			level.Debug(logger).Log("msg", "boltdb file got removed", "filename", name)
+			level.Debug(b.logger).Log("msg", "boltdb file got removed", "filename", name)
 			continue
 		}
 	}
@@ -105,7 +108,7 @@ func (b *BoltIndexClient) reload() {
 
 		for _, name := range removedDBs {
 			if err := b.dbs[name].Close(); err != nil {
-				level.Error(logger).Log("msg", "failed to close removed boltdb", "filename", name, "err", err)
+				level.Error(b.logger).Log("msg", "failed to close removed boltdb", "filename", name, "err", err)
 				continue
 			}
 			delete(b.dbs, name)
@@ -224,7 +227,7 @@ func (b *BoltIndexClient) QueryPages(ctx context.Context, queries []chunk.IndexQ
 	return chunk.DoParallelQueries(ctx, b.query, queries, callback)
 }
 
-func (b *BoltIndexClient) query(ctx context.Context, query chunk.IndexQuery, callback chunk.Callback) error {
+func (b *BoltIndexClient) query(ctx context.Context, query chunk.IndexQuery, callback chunk.QueryCallback) error {
 	db, err := b.GetDB(query.TableName, DBOperationRead)
 	if err != nil {
 		if err == ErrUnexistentBoltDB {

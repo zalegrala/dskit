@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-kit/kit/log"
 	"github.com/grafana/dskit/chunk/chunkfs"
 	"github.com/stretchr/testify/require"
 )
@@ -23,7 +24,7 @@ func TestFSObjectClient_DeleteChunksBefore(t *testing.T) {
 
 	bucketClient, err := NewFSObjectClient(FSConfig{
 		Directory: fsChunksDir,
-	})
+	}, log.NewNopLogger())
 	require.NoError(t, err)
 
 	defer func() {
@@ -68,7 +69,7 @@ func TestFSObjectClient_List(t *testing.T) {
 
 	bucketClient, err := NewFSObjectClient(FSConfig{
 		Directory: fsObjectsDir,
-	})
+	}, log.NewNopLogger())
 	require.NoError(t, err)
 
 	defer func() {
@@ -170,7 +171,7 @@ func TestFSObjectClient_DeleteObject(t *testing.T) {
 
 	bucketClient, err := NewFSObjectClient(FSConfig{
 		Directory: fsObjectsDir,
-	})
+	}, log.NewNopLogger())
 	require.NoError(t, err)
 
 	defer func() {

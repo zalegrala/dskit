@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -55,6 +56,7 @@ type DeleteStoreAPI interface {
 // TombstonesLoader loads delete requests and gen numbers from store and keeps checking for updates.
 // It keeps checking for changes in gen numbers, which also means changes in delete requests and reloads specific users delete requests.
 type TombstonesLoader struct {
+	logger        log.Logger
 	tombstones    map[string]*TombstonesSet
 	tombstonesMtx sync.RWMutex
 
@@ -67,8 +69,9 @@ type TombstonesLoader struct {
 }
 
 // NewTombstonesLoader creates a TombstonesLoader
-func NewTombstonesLoader(deleteStore DeleteStoreAPI, registerer prometheus.Registerer) *TombstonesLoader {
+func NewTombstonesLoader(deleteStore DeleteStoreAPI, registerer prometheus.Registerer, logger log.Logger) *TombstonesLoader {
 	tl := TombstonesLoader{
+		logger:          logger,
 		tombstones:      map[string]*TombstonesSet{},
 		cacheGenNumbers: map[string]*cacheGenNumbers{},
 		deleteStore:     deleteStore,
@@ -95,7 +98,7 @@ func (tl *TombstonesLoader) loop() {
 		case <-tombstonesReloadTimer.C:
 			err := tl.reloadTombstones()
 			if err != nil {
-				level.Error(logger).Log("msg", "error reloading tombstones", "err", err)
+				level.Error(tl.logger).Log("msg", "error reloading tombstones", "err", err)
 			}
 		case <-tl.quit:
 			return
@@ -283,7 +286,7 @@ func (tl *TombstonesLoader) getCacheGenNumbersPerTenants(tenantIDs []string) *ca
 		if numbers.results != "" {
 			results, err := strconv.Atoi(numbers.results)
 			if err != nil {
-				level.Error(logger).Log("msg", "error parsing resultsCacheGenNumber", "user", tenantID, "err", err)
+				level.Error(tl.logger).Log("msg", "error parsing resultsCacheGenNumber", "user", tenantID, "err", err)
 			} else if maxResults < results {
 				maxResults = results
 				result.results = numbers.results
@@ -294,7 +297,7 @@ func (tl *TombstonesLoader) getCacheGenNumbersPerTenants(tenantIDs []string) *ca
 		if numbers.store != "" {
 			store, err := strconv.Atoi(numbers.store)
 			if err != nil {
-				level.Error(logger).Log("msg", "error parsing storeCacheGenNumber", "user", tenantID, "err", err)
+				level.Error(tl.logger).Log("msg", "error parsing storeCacheGenNumber", "user", tenantID, "err", err)
 			} else if maxStore < store {
 				maxStore = store
 				result.store = numbers.store
@@ -324,7 +327,7 @@ func (tl *TombstonesLoader) getCacheGenNumbers(userID string) *cacheGenNumbers {
 
 	genNumbers, err := tl.deleteStore.getCacheGenerationNumbers(context.Background(), userID)
 	if err != nil {
-		level.Error(logger).Log("msg", "error loading cache generation numbers", "err", err)
+		level.Error(tl.logger).Log("msg", "error loading cache generation numbers", "err", err)
 		tl.metrics.cacheGenLoadFailures.Inc()
 		return &cacheGenNumbers{}
 	}

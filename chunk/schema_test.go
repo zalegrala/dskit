@@ -8,6 +8,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/go-kit/kit/log"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/pkg/labels"
@@ -43,7 +44,7 @@ func mustMakeSchema(schemaName string) BaseSchema {
 	s, err := PeriodConfig{
 		Schema:      schemaName,
 		IndexTables: PeriodicTableConfig{Prefix: table},
-	}.CreateSchema()
+	}.CreateSchema(log.NewNopLogger())
 	if err != nil {
 		panic(err)
 	}

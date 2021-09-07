@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-kit/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -34,8 +35,8 @@ func TestDoRequest(t *testing.T) {
 	}))
 	defer server.Close()
 
-	resp, err := doRequest(server.URL, 1*time.Second, nil, 0)
-	assert.Nil(t, err)
+	resp, err := doRequest(server.URL, 1*time.Second, nil, 0, log.NewNopLogger())
+	require.Nil(t, err)
 
 	expected := ConfigsResponse{Configs: map[string]userconfig.View{
 		"2": {

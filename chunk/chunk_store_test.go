@@ -63,9 +63,9 @@ func newTestChunkStore(t require.TestingT, schemaName string) Store {
 }
 
 func newTestChunkStoreConfig(t require.TestingT, schemaName string, storeCfg StoreConfig) Store {
-	schemaCfg := DefaultSchemaConfig("", schemaName, 0)
+	schemaCfg := DefaultSchemaConfig("", schemaName, 0, log.NewNopLogger())
 
-	schema, err := schemaCfg.Configs[0].CreateSchema()
+	schema, err := schemaCfg.Configs[0].CreateSchema(log.NewNopLogger())
 	require.NoError(t, err)
 
 	return newTestChunkStoreConfigWithMockStorage(t, schemaCfg, schema, storeCfg)
@@ -73,11 +73,11 @@ func newTestChunkStoreConfig(t require.TestingT, schemaName string, storeCfg Sto
 
 func newTestChunkStoreConfigWithMockStorage(t require.TestingT, schemaCfg SchemaConfig, schema BaseSchema, storeCfg StoreConfig) Store {
 	var tbmConfig TableManagerConfig
-	err := schemaCfg.Validate()
+	err := schemaCfg.Validate(log.NewNopLogger())
 	require.NoError(t, err)
 	flagext.DefaultValues(&tbmConfig)
-	storage := NewMockStorage()
-	tableManager, err := NewTableManager(tbmConfig, schemaCfg, maxChunkAge, storage, nil, nil, nil)
+	storage := NewMockStorage(log.NewNopLogger())
+	tableManager, err := NewTableManager(tbmConfig, schemaCfg, maxChunkAge, storage, nil, nil, nil, log.NewNopLogger())
 	require.NoError(t, err)
 
 	err = tableManager.SyncTables(context.Background())
@@ -96,8 +96,8 @@ func newTestChunkStoreConfigWithMockStorage(t require.TestingT, schemaCfg Schema
 	writeDedupeCache, err := cache.New(storeCfg.WriteDedupeCacheConfig, reg, logger)
 	require.NoError(t, err)
 
-	store := NewCompositeStore(nil)
-	err = store.addSchema(storeCfg, schema, schemaCfg.Configs[0].From.Time, storage, storage, overrides, chunksCache, writeDedupeCache)
+	store := NewCompositeStore(nil, log.NewNopLogger())
+	err = store.addSchema(storeCfg, schema, schemaCfg.Configs[0].From.Time, storage, storage, overrides, chunksCache, writeDedupeCache, log.NewNopLogger())
 	require.NoError(t, err)
 	return store
 }
@@ -1144,7 +1144,5 @@ func TestDisableIndexDeduplication(t *testing.T) {
 			// see if we deduped the chunk and the number of chunks we wrote is still 1
 			require.Equal(t, 1, storage.numChunkWrites)
 		})
-
 	}
-
 }

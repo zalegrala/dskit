@@ -7,7 +7,7 @@ require (
 	cloud.google.com/go/bigtable v1.3.0
 	cloud.google.com/go/storage v1.16.0
 	github.com/Azure/azure-pipeline-go v0.2.3
-	github.com/Azure/azure-storage-blob-go v0.14.0
+	github.com/Azure/azure-storage-blob-go v0.8.0
 	github.com/alecthomas/units v0.0.0-20210208195552-ff826a37aa15
 	github.com/alicebob/miniredis/v2 v2.15.1
 	github.com/armon/go-metrics v0.3.6
@@ -21,7 +21,7 @@ require (
 	github.com/go-kit/kit v0.11.0
 	github.com/go-kit/log v0.1.0
 	github.com/go-redis/redis/v8 v8.11.3
-	github.com/gocql/gocql v0.0.0-20210817081954-bc256bbb90de
+	github.com/gocql/gocql v0.0.0-20200526081602-cd04bd7f22a7
 	github.com/gogo/protobuf v1.3.2
 	github.com/gogo/status v1.1.0
 	github.com/golang/protobuf v1.5.2
@@ -73,3 +73,6 @@ replace k8s.io/client-go v12.0.0+incompatible => k8s.io/client-go v0.21.4
 
 // Using a 3rd-party branch for custom dialer - see https://github.com/bradfitz/gomemcache/pull/86
 replace github.com/bradfitz/gomemcache => github.com/themihai/gomemcache v0.0.0-20180902122335-24332e2d58ab
+
+// Use fork of gocql that has gokit logs and Prometheus metrics.
+replace github.com/gocql/gocql => github.com/grafana/gocql v0.0.0-20200605141915-ba5dc39ece85

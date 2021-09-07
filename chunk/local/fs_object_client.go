@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/thanos-io/thanos/pkg/runutil"
 
@@ -33,12 +34,13 @@ func (cfg *FSConfig) RegisterFlagsWithPrefix(prefix string, f *flag.FlagSet) {
 
 // FSObjectClient holds config for filesystem as object store
 type FSObjectClient struct {
+	logger        log.Logger
 	cfg           FSConfig
 	pathSeparator string
 }
 
 // NewFSObjectClient makes a chunk.Client which stores chunks as files in the local filesystem.
-func NewFSObjectClient(cfg FSConfig) (*FSObjectClient, error) {
+func NewFSObjectClient(cfg FSConfig, logger log.Logger) (*FSObjectClient, error) {
 	// filepath.Clean cleans up the path by removing unwanted duplicate slashes, dots etc.
 	// This is needed because DeleteObject works on paths which are already cleaned up and it
 	// checks whether it is about to delete the configured directory when it becomes empty
@@ -48,6 +50,7 @@ func NewFSObjectClient(cfg FSConfig) (*FSObjectClient, error) {
 	}
 
 	return &FSObjectClient{
+		logger:        logger,
 		cfg:           cfg,
 		pathSeparator: string(os.PathSeparator),
 	}, nil
@@ -79,7 +82,7 @@ func (f *FSObjectClient) PutObject(_ context.Context, objectKey string, object i
 		return err
 	}
 
-	defer runutil.CloseWithLogOnErr(logger, fl, "fullPath: %s", fullPath)
+	defer runutil.CloseWithLogOnErr(f.logger, fl, "fullPath: %s", fullPath)
 
 	_, err = io.Copy(fl, object)
 	if err != nil {
@@ -186,7 +189,7 @@ func (f *FSObjectClient) DeleteObject(ctx context.Context, objectKey string) err
 func (f *FSObjectClient) DeleteChunksBefore(ctx context.Context, ts time.Time) error {
 	return filepath.Walk(f.cfg.Directory, func(path string, info os.FileInfo, err error) error {
 		if !info.IsDir() && info.ModTime().Before(ts) {
-			level.Info(logger).Log("msg", "file has exceeded the retention period, removing it", "filepath", info.Name())
+			level.Info(f.logger).Log("msg", "file has exceeded the retention period, removing it", "filepath", info.Name())
 			if err := os.Remove(path); err != nil {
 				return err
 			}

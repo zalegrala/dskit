@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/go-kit/kit/log"
 	"github.com/stretchr/testify/require"
 	"go.etcd.io/bbolt"
 
@@ -42,7 +43,7 @@ func TestBoltDBReload(t *testing.T) {
 
 	boltdbIndexClient, err := NewBoltDBIndexClient(BoltDBConfig{
 		Directory: dirname,
-	})
+	}, log.NewNopLogger())
 	require.NoError(t, err)
 
 	defer boltdbIndexClient.Stop()
@@ -85,7 +86,7 @@ func TestBoltDB_GetDB(t *testing.T) {
 
 	boltdbIndexClient, err := NewBoltDBIndexClient(BoltDBConfig{
 		Directory: dirname,
-	})
+	}, log.NewNopLogger())
 	require.NoError(t, err)
 
 	// setup a db to already exist
@@ -111,7 +112,7 @@ func TestBoltDB_GetDB(t *testing.T) {
 	boltdbIndexClient.Stop()
 	boltdbIndexClient, err = NewBoltDBIndexClient(BoltDBConfig{
 		Directory: dirname,
-	})
+	}, log.NewNopLogger())
 	require.NoError(t, err)
 	defer boltdbIndexClient.Stop()
 
@@ -126,7 +127,7 @@ func Test_CreateTable_BoltdbRW(t *testing.T) {
 
 	indexClient, err := NewBoltDBIndexClient(BoltDBConfig{
 		Directory: dirname,
-	})
+	}, log.NewNopLogger())
 	require.NoError(t, err)
 
 	tableClient, err := NewTableClient(dirname)
@@ -216,7 +217,7 @@ func TestBoltDB_Writes(t *testing.T) {
 
 			indexClient, err := NewBoltDBIndexClient(BoltDBConfig{
 				Directory: dirname,
-			})
+			}, log.NewNopLogger())
 			require.NoError(t, err)
 
 			defer func() {

@@ -141,7 +141,7 @@ groups:
 		},
 	} {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			rules, err := tc.cfg.Parse()
+			rules, err := tc.cfg.Parse(log.NewNopLogger())
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, rules)
 		})
