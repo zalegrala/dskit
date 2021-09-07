@@ -70,3 +70,6 @@ require (
 )
 
 replace k8s.io/client-go v12.0.0+incompatible => k8s.io/client-go v0.21.4
+
+// Using a 3rd-party branch for custom dialer - see https://github.com/bradfitz/gomemcache/pull/86
+replace github.com/bradfitz/gomemcache => github.com/themihai/gomemcache v0.0.0-20180902122335-24332e2d58ab

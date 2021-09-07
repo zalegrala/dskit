@@ -12,6 +12,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/gogo/protobuf/proto"
+	"github.com/grafana/dskit/dslog"
 	"github.com/grafana/dskit/services"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -139,7 +140,7 @@ type Purger struct {
 
 // NewPurger creates a new Purger
 func NewPurger(cfg Config, deleteStore *DeleteStore, chunkStore chunk.Store, storageClient chunk.ObjectClient, registerer prometheus.Registerer) (*Purger, error) {
-	dslog.WarnExperimentalUse("Delete series API")
+	dslog.WarnExperimentalUse("Delete series API", logger)
 
 	purger := Purger{
 		cfg:                      cfg,
