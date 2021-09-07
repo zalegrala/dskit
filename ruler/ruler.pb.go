@@ -14,7 +14,7 @@ import (
 	_ "github.com/golang/protobuf/ptypes/timestamp"
 	_ "github.com/grafana/dskit/dskitpb"
 	github_com_grafana_dskit_dskitpb "github.com/grafana/dskit/dskitpb"
-	rulespb "github.com/grafana/dskit/rulespb"
+	rulespb "github.com/grafana/dskit/ruler/rulespb"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
