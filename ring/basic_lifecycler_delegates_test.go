@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/grafana/dskit/concurrency"
 	"github.com/grafana/dskit/services"
 	"github.com/grafana/dskit/testutil"
 )
@@ -51,7 +52,7 @@ func TestTokensPersistencyDelegate_ShouldSkipTokensLoadingIfFileDoesNotExist(t *
 		},
 	}
 
-	logs := &syncBuffer{}
+	logs := &concurrency.SyncBuffer{}
 	logger := log.NewLogfmtLogger(logs)
 	persistencyDelegate := NewTokensPersistencyDelegate(tokensFile.Name(), ACTIVE, testDelegate, logger)
 
