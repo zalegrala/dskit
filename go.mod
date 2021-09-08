@@ -22,6 +22,7 @@ require (
 	github.com/go-kit/log v0.1.0
 	github.com/go-redis/redis/v8 v8.11.3
 	github.com/gocql/gocql v0.0.0-20200526081602-cd04bd7f22a7
+	github.com/gogo/googleapis v1.4.0
 	github.com/gogo/protobuf v1.3.2
 	github.com/gogo/status v1.1.0
 	github.com/golang/protobuf v1.5.2
@@ -44,6 +45,8 @@ require (
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.29.0
 	github.com/prometheus/prometheus v1.8.2-0.20210720123808-b1ed4a0a663d
+	github.com/sercand/kuberesolver v2.4.0+incompatible
+	github.com/sirupsen/logrus v1.8.1
 	github.com/sony/gobreaker v0.4.1
 	github.com/spf13/afero v1.2.2
 	github.com/stretchr/testify v1.7.0

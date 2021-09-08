@@ -23,6 +23,10 @@ chunk/grpc/grpc.pb.go: chunk/grpc/grpc.proto
 chunk/storage/caching_index_client.pb.go: chunk/storage/caching_index_client.proto
 chunk/purger/delete_plan.pb.go: chunk/purger/delete_plan.proto
 querier/queryrange/queryrange.pb.go: querier/queryrange/queryrange.proto
+querier/stats/stats.pb.go: querier/stats/stats.proto
+scheduler/schedulerpb/scheduler.pb.go: scheduler/schedulerpb/scheduler.proto
+frontend/v1/frontendv1pb/frontend.pb.go: frontend/v1/frontendv1pb/frontend.proto
+frontend/v2/frontendv2pb/frontend.pb.go: frontend/v2/frontendv2pb/frontend.proto
 
 ifeq ($(BUILD_IN_CONTAINER),true)
 
