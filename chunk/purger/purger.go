@@ -141,7 +141,7 @@ type Purger struct {
 
 // NewPurger creates a new Purger
 func NewPurger(cfg Config, deleteStore *DeleteStore, chunkStore chunk.Store, storageClient chunk.ObjectClient, registerer prometheus.Registerer, logger log.Logger) (*Purger, error) {
-	dslog.WarnExperimentalUse("Delete series API", logger)
+	dslog.WarnExperimentalUse("Delete series API", logger, registerer)
 
 	purger := Purger{
 		logger:                   logger,

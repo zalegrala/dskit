@@ -278,7 +278,7 @@ func NewChunkClient(name string, cfg Config, schemaCfg chunk.SchemaConfig, regis
 		}
 		return aws.NewDynamoDBChunkClient(cfg.AWSStorageConfig.DynamoDBConfig, schemaCfg, registerer, logger)
 	case StorageTypeAzure:
-		return newChunkClientFromStore(azure.NewBlobStorage(&cfg.AzureStorageConfig, logger))
+		return newChunkClientFromStore(azure.NewBlobStorage(&cfg.AzureStorageConfig, logger, registerer))
 	case StorageTypeGCP:
 		return gcp.NewBigtableObjectClient(context.Background(), cfg.GCPStorageConfig, schemaCfg)
 	case StorageTypeGCPColumnKey, StorageTypeBigTable, StorageTypeBigTableHashed:
@@ -286,7 +286,7 @@ func NewChunkClient(name string, cfg Config, schemaCfg chunk.SchemaConfig, regis
 	case StorageTypeGCS:
 		return newChunkClientFromStore(gcp.NewGCSObjectClient(context.Background(), cfg.GCSConfig))
 	case StorageTypeSwift:
-		return newChunkClientFromStore(openstack.NewSwiftObjectClient(cfg.Swift, logger))
+		return newChunkClientFromStore(openstack.NewSwiftObjectClient(cfg.Swift, logger, registerer))
 	case StorageTypeCassandra:
 		return cassandra.NewObjectClient(cfg.CassandraStorageConfig, schemaCfg, registerer, logger)
 	case StorageTypeFileSystem:
@@ -352,16 +352,16 @@ func NewBucketClient(storageConfig Config, logger log.Logger) (chunk.BucketClien
 }
 
 // NewObjectClient makes a new StorageClient of the desired types.
-func NewObjectClient(name string, cfg Config, logger log.Logger) (chunk.ObjectClient, error) {
+func NewObjectClient(name string, cfg Config, logger log.Logger, reg prometheus.Registerer) (chunk.ObjectClient, error) {
 	switch name {
 	case StorageTypeAWS, StorageTypeS3:
 		return aws.NewS3ObjectClient(cfg.AWSStorageConfig.S3Config)
 	case StorageTypeGCS:
 		return gcp.NewGCSObjectClient(context.Background(), cfg.GCSConfig)
 	case StorageTypeAzure:
-		return azure.NewBlobStorage(&cfg.AzureStorageConfig, logger)
+		return azure.NewBlobStorage(&cfg.AzureStorageConfig, logger, reg)
 	case StorageTypeSwift:
-		return openstack.NewSwiftObjectClient(cfg.Swift, logger)
+		return openstack.NewSwiftObjectClient(cfg.Swift, logger, reg)
 	case StorageTypeInMemory:
 		return chunk.NewMockStorage(logger), nil
 	case StorageTypeFileSystem:
