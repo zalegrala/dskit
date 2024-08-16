@@ -164,7 +164,7 @@ func NewQuicTransport(config QuicTransportConfig, logger log.Logger, registerer 
 		// to pick an available port and then apply that to everything
 		// else.
 		if port == 0 {
-			port = quickLn.Addr().(*net.TCPAddr).Port
+			port = quickLn.Addr().(*net.UDPAddr).Port
 		}
 	}
 
