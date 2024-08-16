@@ -320,7 +320,7 @@ func (t *QuicTransport) handleConnection(conn quic.Connection) {
 }
 
 func (t *QuicTransport) getConnection(addr string, timeout time.Duration) (net.Conn, error) {
-	return tls.DialWithDialer(&net.Dialer{Timeout: timeout}, "tcp", addr, t.tlsConfig)
+	return tls.DialWithDialer(&net.Dialer{Timeout: timeout}, "udp", addr, t.tlsConfig)
 }
 
 // GetAutoBindPort returns the bind port that was automatically given by the
@@ -556,7 +556,7 @@ func (t *QuicTransport) Shutdown() error {
 }
 
 func (t *QuicTransport) registerMetrics(registerer prometheus.Registerer) {
-	const subsystem = "memberlist_tcp_transport"
+	const subsystem = "memberlist_quic_transport"
 
 	t.incomingStreams = promauto.With(registerer).NewCounter(prometheus.CounterOpts{
 		Namespace: t.cfg.MetricsNamespace,
