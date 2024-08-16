@@ -163,7 +163,8 @@ type KVConfig struct {
 	// How much space to use to keep received and sent messages in memory (for troubleshooting).
 	MessageHistoryBufferBytes int `yaml:"message_history_buffer_bytes" category:"advanced"`
 
-	TCPTransport TCPTransportConfig `yaml:",inline"`
+	TCPTransport  TCPTransportConfig  `yaml:",inline"`
+	QuicTransport QuicTransportConfig `yaml:",inline"`
 
 	MetricsNamespace string `yaml:"-"`
 
@@ -1461,6 +1462,7 @@ func (m *KV) storeCopy() map[string]ValueDesc {
 	}
 	return result
 }
+
 func (m *KV) addReceivedMessage(msg Message) {
 	if m.cfg.MessageHistoryBufferBytes == 0 {
 		return

@@ -2,6 +2,7 @@ package memberlist
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	"crypto/tls"
 	"flag"
@@ -11,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	quic "github.com/quic-go/quic-go"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
@@ -26,21 +29,8 @@ import (
 	"github.com/grafana/dskit/netutil"
 )
 
-type messageType uint8
-
-const (
-	_ messageType = iota // don't use 0
-	packet
-	stream
-)
-
-const (
-	zeroZeroZeroZero = "0.0.0.0"
-	colonColon       = "::"
-)
-
-// TCPTransportConfig is a configuration structure for creating new TCPTransport.
-type TCPTransportConfig struct {
+// QuicTransportConfig is a configuration structure for creating new QuicTransport.
+type QuicTransportConfig struct {
 	// BindAddrs is a list of IP addresses to bind to.
 	BindAddrs flagext.StringSlice `yaml:"bind_addr"`
 
@@ -60,16 +50,17 @@ type TCPTransportConfig struct {
 	// Where to put custom metrics. nil = don't register.
 	MetricsNamespace string `yaml:"-"`
 
-	TLSEnabled bool               `yaml:"tls_enabled" category:"advanced"`
-	TLS        dstls.ClientConfig `yaml:",inline"`
+	// TLS is required for quic
+	// TLSEnabled bool               `yaml:"tls_enabled" category:"advanced"`
+	TLS dstls.ClientConfig `yaml:",inline"`
 }
 
-func (cfg *TCPTransportConfig) RegisterFlags(f *flag.FlagSet) {
+func (cfg *QuicTransportConfig) RegisterFlags(f *flag.FlagSet) {
 	cfg.RegisterFlagsWithPrefix(f, "")
 }
 
 // RegisterFlagsWithPrefix registers flags with prefix.
-func (cfg *TCPTransportConfig) RegisterFlagsWithPrefix(f *flag.FlagSet, prefix string) {
+func (cfg *QuicTransportConfig) RegisterFlagsWithPrefix(f *flag.FlagSet, prefix string) {
 	// "Defaults to hostname" -- memberlist sets it to hostname by default.
 	f.Var(&cfg.BindAddrs, prefix+"memberlist.bind-addr", "IP address to listen on for gossip messages. Multiple addresses may be specified. Defaults to 0.0.0.0")
 	f.IntVar(&cfg.BindPort, prefix+"memberlist.bind-port", 7946, "Port to listen on for gossip messages.")
@@ -77,21 +68,21 @@ func (cfg *TCPTransportConfig) RegisterFlagsWithPrefix(f *flag.FlagSet, prefix s
 	f.DurationVar(&cfg.PacketWriteTimeout, prefix+"memberlist.packet-write-timeout", 5*time.Second, "Timeout for writing 'packet' data.")
 	f.BoolVar(&cfg.TransportDebug, prefix+"memberlist.transport-debug", false, "Log debug transport messages. Note: global log.level must be at debug level as well.")
 
-	f.BoolVar(&cfg.TLSEnabled, prefix+"memberlist.tls-enabled", false, "Enable TLS on the memberlist transport layer.")
+	// f.BoolVar(&cfg.TLSEnabled, prefix+"memberlist.tls-enabled", false, "Enable TLS on the memberlist transport layer.")
 	cfg.TLS.RegisterFlagsWithPrefix(prefix+"memberlist", f)
 }
 
-// TCPTransport is a memberlist.Transport implementation that uses TCP for both packet and stream
+// QuicTransport is a memberlist.Transport implementation that uses Quic for both packet and stream
 // operations ("packet" and "stream" are terms used by memberlist).
-// It uses a new TCP connections for each operation. There is no connection reuse.
-type TCPTransport struct {
-	cfg          TCPTransportConfig
-	logger       log.Logger
-	packetCh     chan *memberlist.Packet
-	connCh       chan net.Conn
-	wg           sync.WaitGroup
-	tcpListeners []net.Listener
-	tlsConfig    *tls.Config
+// It uses a new Quic connections for each operation. There is no connection reuse.
+type QuicTransport struct {
+	cfg           QuicTransportConfig
+	logger        log.Logger
+	packetCh      chan *memberlist.Packet
+	connCh        chan quic.Connection
+	wg            sync.WaitGroup
+	quicListeners []quic.Listener
+	tlsConfig     *tls.Config
 
 	shutdown atomic.Int32
 
@@ -112,28 +103,26 @@ type TCPTransport struct {
 	unknownConnections    prometheus.Counter
 }
 
-// NewTCPTransport returns a new tcp-based transport with the given configuration. On
+// NewQuicTransport returns a new quic-based transport with the given configuration. On
 // success all the network listeners will be created and listening.
-func NewTCPTransport(config TCPTransportConfig, logger log.Logger, registerer prometheus.Registerer) (*TCPTransport, error) {
+func NewQuicTransport(config QuicTransportConfig, logger log.Logger, registerer prometheus.Registerer) (*QuicTransport, error) {
 	if len(config.BindAddrs) == 0 {
 		config.BindAddrs = []string{zeroZeroZeroZero}
 	}
 
 	// Build out the new transport.
 	var ok bool
-	t := TCPTransport{
+	t := QuicTransport{
 		cfg:      config,
-		logger:   log.With(logger, "component", "memberlist TCPTransport"),
+		logger:   log.With(logger, "component", "memberlist QuicTransport"),
 		packetCh: make(chan *memberlist.Packet),
-		connCh:   make(chan net.Conn),
+		connCh:   make(chan quic.Connection),
 	}
 
 	var err error
-	if config.TLSEnabled {
-		t.tlsConfig, err = config.TLS.GetTLSConfig()
-		if err != nil {
-			return nil, errors.Wrap(err, "unable to create TLS config")
-		}
+	t.tlsConfig, err = config.TLS.GetTLSConfig()
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to create TLS config")
 	}
 
 	t.registerMetrics(registerer)
@@ -145,7 +134,7 @@ func NewTCPTransport(config TCPTransportConfig, logger log.Logger, registerer pr
 		}
 	}()
 
-	// Build all the TCP and UDP listeners.
+	// Build all the Quic and UDP listeners.
 	port := config.BindPort
 	for _, addr := range config.BindAddrs {
 		ip := net.ParseIP(addr)
@@ -153,59 +142,60 @@ func NewTCPTransport(config TCPTransportConfig, logger log.Logger, registerer pr
 			return nil, fmt.Errorf("could not parse bind addr %q as IP address", addr)
 		}
 
-		tcpAddr := &net.TCPAddr{IP: ip, Port: port}
-
-		var tcpLn net.Listener
-		if config.TLSEnabled {
-			tcpLn, err = tls.Listen("tcp", tcpAddr.String(), t.tlsConfig)
-			if err != nil {
-				return nil, errors.Wrapf(err, "failed to start TLS TCP listener on %q port %d", addr, port)
-			}
-		} else {
-			tcpLn, err = net.ListenTCP("tcp", tcpAddr)
-			if err != nil {
-				return nil, errors.Wrapf(err, "failed to start TCP listener on %q port %d", addr, port)
-			}
+		var quickLn *quic.Listener
+		// TODO: support "udp6"
+		udpConn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: ip, Port: port})
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to start UDP listener on %q port %d", addr, port)
 		}
 
-		t.tcpListeners = append(t.tcpListeners, tcpLn)
+		tr := quic.Transport{
+			Conn: udpConn,
+		}
+		quickLn, err = tr.Listen(t.tlsConfig, &quic.Config{})
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to start TLS Quic listener on %q port %d", addr, port)
+		}
 
-		// If the config port given was zero, use the first TCP listener
+		// TODO: why aren't we storing a pointer?
+		t.quicListeners = append(t.quicListeners, *quickLn)
+
+		// If the config port given was zero, use the first Quic listener
 		// to pick an available port and then apply that to everything
 		// else.
 		if port == 0 {
-			port = tcpLn.Addr().(*net.TCPAddr).Port
+			port = quickLn.Addr().(*net.TCPAddr).Port
 		}
 	}
 
 	// Fire them up now that we've been able to create them all.
 	for i := 0; i < len(config.BindAddrs); i++ {
 		t.wg.Add(1)
-		go t.tcpListen(t.tcpListeners[i])
+		go t.quicListen(t.quicListeners[i])
 	}
 
 	ok = true
 	return &t, nil
 }
 
-// tcpListen is a long running goroutine that accepts incoming TCP connections
-// and spawns new go routine to handle each connection. This transport uses TCP connections
+// quicListen is a long running goroutine that accepts incoming Quic connections
+// and spawns new go routine to handle each connection. This transport uses Quic connections
 // for both packet sending and streams.
 // (copied from Memberlist net_transport.go)
-func (t *TCPTransport) tcpListen(tcpLn net.Listener) {
+func (t *QuicTransport) quicListen(quicLn quic.Listener) {
 	defer t.wg.Done()
 
-	// baseDelay is the initial delay after an AcceptTCP() error before attempting again
+	// baseDelay is the initial delay after an AcceptQuic() error before attempting again
 	const baseDelay = 5 * time.Millisecond
 
-	// maxDelay is the maximum delay after an AcceptTCP() error before attempting again.
-	// In the case that tcpListen() is error-looping, it will delay the shutdown check.
+	// maxDelay is the maximum delay after an AcceptQuic() error before attempting again.
+	// In the case that quicListen() is error-looping, it will delay the shutdown check.
 	// Therefore, changes to maxDelay may have an effect on the latency of shutdown.
 	const maxDelay = 1 * time.Second
 
 	var loopDelay time.Duration
 	for {
-		conn, err := tcpLn.Accept()
+		conn, err := quicLn.Accept(context.TODO())
 		if err != nil {
 			if s := t.shutdown.Load(); s == 1 {
 				break
@@ -221,7 +211,7 @@ func (t *TCPTransport) tcpListen(tcpLn net.Listener) {
 				loopDelay = maxDelay
 			}
 
-			level.Error(t.logger).Log("msg", "Error accepting TCP connection", "err", err)
+			level.Error(t.logger).Log("msg", "Error accepting Quic connection", "err", err)
 			time.Sleep(loopDelay)
 			continue
 		}
@@ -232,28 +222,32 @@ func (t *TCPTransport) tcpListen(tcpLn net.Listener) {
 	}
 }
 
-var noopLogger = log.NewNopLogger()
-
-func (t *TCPTransport) debugLog() log.Logger {
+func (t *QuicTransport) debugLog() log.Logger {
 	if t.cfg.TransportDebug {
 		return level.Debug(t.logger)
 	}
 	return noopLogger
 }
 
-func (t *TCPTransport) handleConnection(conn net.Conn) {
+func (t *QuicTransport) handleConnection(conn quic.Connection) {
 	t.debugLog().Log("msg", "New connection", "addr", conn.RemoteAddr())
 
 	closeConn := true
 	defer func() {
 		if closeConn {
-			_ = conn.Close()
+			// _ = conn.Close()
 		}
 	}()
 
+	str, err := conn.AcceptStream(context.TODO())
+	if err != nil {
+		level.Warn(t.logger).Log("msg", "failed to accept stream", "err", err, "remote", conn.RemoteAddr())
+		return
+	}
+
 	// let's read first byte, and determine what to do about this connection
 	msgType := []byte{0}
-	_, err := io.ReadFull(conn, msgType)
+	_, err = io.ReadFull(str, msgType)
 	if err != nil {
 		level.Warn(t.logger).Log("msg", "failed to read message type", "err", err, "remote", conn.RemoteAddr())
 		return
@@ -271,7 +265,7 @@ func (t *TCPTransport) handleConnection(conn net.Conn) {
 
 		// before reading packet, read the address
 		addrLengthBuf := []byte{0}
-		_, err := io.ReadFull(conn, addrLengthBuf)
+		_, err := io.ReadFull(str, addrLengthBuf)
 		if err != nil {
 			t.receivedPacketsErrors.Inc()
 			level.Warn(t.logger).Log("msg", "error while reading node address length from packet", "err", err, "remote", conn.RemoteAddr())
@@ -279,7 +273,7 @@ func (t *TCPTransport) handleConnection(conn net.Conn) {
 		}
 
 		addrBuf := make([]byte, addrLengthBuf[0])
-		_, err = io.ReadFull(conn, addrBuf)
+		_, err = io.ReadFull(str, addrBuf)
 		if err != nil {
 			t.receivedPacketsErrors.Inc()
 			level.Warn(t.logger).Log("msg", "error while reading node address from packet", "err", err, "remote", conn.RemoteAddr())
@@ -287,7 +281,7 @@ func (t *TCPTransport) handleConnection(conn net.Conn) {
 		}
 
 		// read the rest to buffer -- this is the "packet" itself
-		buf, err := io.ReadAll(conn)
+		buf, err := io.ReadAll(str)
 		if err != nil {
 			t.receivedPacketsErrors.Inc()
 			level.Warn(t.logger).Log("msg", "error while reading packet data", "err", err, "remote", conn.RemoteAddr())
@@ -325,37 +319,23 @@ func (t *TCPTransport) handleConnection(conn net.Conn) {
 	}
 }
 
-type addr string
-
-// TODO: determine impact on quic_transport.go
-func (a addr) Network() string {
-	return "tcp"
-}
-
-func (a addr) String() string {
-	return string(a)
-}
-
-func (t *TCPTransport) getConnection(addr string, timeout time.Duration) (net.Conn, error) {
-	if t.cfg.TLSEnabled {
-		return tls.DialWithDialer(&net.Dialer{Timeout: timeout}, "tcp", addr, t.tlsConfig)
-	}
-	return net.DialTimeout("tcp", addr, timeout)
+func (t *QuicTransport) getConnection(addr string, timeout time.Duration) (net.Conn, error) {
+	return tls.DialWithDialer(&net.Dialer{Timeout: timeout}, "tcp", addr, t.tlsConfig)
 }
 
 // GetAutoBindPort returns the bind port that was automatically given by the
 // kernel, if a bind port of 0 was given.
-func (t *TCPTransport) GetAutoBindPort() int {
-	// We made sure there's at least one TCP listener, and that one's
+func (t *QuicTransport) GetAutoBindPort() int {
+	// We made sure there's at least one Quic listener, and that one's
 	// port was applied to all the others for the dynamic bind case.
-	return t.tcpListeners[0].Addr().(*net.TCPAddr).Port
+	return t.quicListeners[0].Addr().(*net.UDPAddr).Port
 }
 
 // FinalAdvertiseAddr is given the user's configured values (which
 // might be empty) and returns the desired IP and port to advertise to
 // the rest of the cluster.
 // (Copied from memberlist' net_transport.go)
-func (t *TCPTransport) FinalAdvertiseAddr(ip string, port int) (net.IP, int, error) {
+func (t *QuicTransport) FinalAdvertiseAddr(ip string, port int) (net.IP, int, error) {
 	var advertiseAddr net.IP
 	var advertisePort int
 	if ip != "" {
@@ -397,8 +377,8 @@ func (t *TCPTransport) FinalAdvertiseAddr(ip string, port int) (net.IP, int, err
 			}
 		default:
 			// Use the IP that we're bound to, based on the first
-			// TCP listener, which we already ensure is there.
-			advertiseAddr = t.tcpListeners[0].Addr().(*net.TCPAddr).IP
+			// Quic listener, which we already ensure is there.
+			advertiseAddr = t.quicListeners[0].Addr().(*net.UDPAddr).IP
 		}
 
 		// Use the port we are bound to.
@@ -411,14 +391,14 @@ func (t *TCPTransport) FinalAdvertiseAddr(ip string, port int) (net.IP, int, err
 	return advertiseAddr, advertisePort, nil
 }
 
-func (t *TCPTransport) setAdvertisedAddr(advertiseAddr net.IP, advertisePort int) {
+func (t *QuicTransport) setAdvertisedAddr(advertiseAddr net.IP, advertisePort int) {
 	t.advertiseMu.Lock()
 	defer t.advertiseMu.Unlock()
-	addr := net.TCPAddr{IP: advertiseAddr, Port: advertisePort}
+	addr := net.UDPAddr{IP: advertiseAddr, Port: advertisePort}
 	t.advertiseAddr = addr.String()
 }
 
-func (t *TCPTransport) getAdvertisedAddr() string {
+func (t *QuicTransport) getAdvertisedAddr() string {
 	t.advertiseMu.RLock()
 	defer t.advertiseMu.RUnlock()
 	return t.advertiseAddr
@@ -426,7 +406,7 @@ func (t *TCPTransport) getAdvertisedAddr() string {
 
 // WriteTo is a packet-oriented interface that fires off the given
 // payload to the given address.
-func (t *TCPTransport) WriteTo(b []byte, addr string) (time.Time, error) {
+func (t *QuicTransport) WriteTo(b []byte, addr string) (time.Time, error) {
 	t.sentPackets.Inc()
 	t.sentPacketsBytes.Add(float64(len(b)))
 
@@ -442,7 +422,7 @@ func (t *TCPTransport) WriteTo(b []byte, addr string) (time.Time, error) {
 		}
 		logLevel.Log("msg", "WriteTo failed", "addr", addr, "err", err)
 
-		// WriteTo is used to send "UDP" packets. Since we use TCP, we can detect more errors,
+		// WriteTo is used to send "UDP" packets. Since we use Quic, we can detect more errors,
 		// but memberlist library doesn't seem to cope with that very well. That is why we return nil instead.
 		return time.Now(), nil
 	}
@@ -450,7 +430,7 @@ func (t *TCPTransport) WriteTo(b []byte, addr string) (time.Time, error) {
 	return time.Now(), nil
 }
 
-func (t *TCPTransport) writeTo(b []byte, addr string) error {
+func (t *QuicTransport) writeTo(b []byte, addr string) error {
 	// Open connection, write packet header and data, data hash, close. Simple.
 	c, err := t.getConnection(addr, t.cfg.PacketDialTimeout)
 	if err != nil {
@@ -475,8 +455,8 @@ func (t *TCPTransport) writeTo(b []byte, addr string) error {
 	headerBuf := bytes.Buffer{}
 	headerBuf.WriteByte(byte(packet))
 
-	// We need to send our address to the other side, otherwise other side can only see IP and port from TCP header.
-	// But that doesn't match our node address (new TCP connection has new random port), which confuses memberlist.
+	// We need to send our address to the other side, otherwise other side can only see IP and port from Quic header.
+	// But that doesn't match our node address (new Quic connection has new random port), which confuses memberlist.
 	// So we send our advertised address, so that memberlist on the receiving side can match it with correct node.
 	// This seems to be important for node probes (pings) done by memberlist.
 	ourAddr := t.getAdvertisedAddr()
@@ -529,13 +509,13 @@ func (t *TCPTransport) writeTo(b []byte, addr string) error {
 
 // PacketCh returns a channel that can be read to receive incoming
 // packets from other peers.
-func (t *TCPTransport) PacketCh() <-chan *memberlist.Packet {
+func (t *QuicTransport) PacketCh() <-chan *memberlist.Packet {
 	return t.packetCh
 }
 
 // DialTimeout is used to create a connection that allows memberlist to perform
 // two-way communication with a peer.
-func (t *TCPTransport) DialTimeout(addr string, timeout time.Duration) (net.Conn, error) {
+func (t *QuicTransport) DialTimeout(addr string, timeout time.Duration) (net.Conn, error) {
 	t.outgoingStreams.Inc()
 	c, err := t.getConnection(addr, timeout)
 	if err != nil {
@@ -555,18 +535,18 @@ func (t *TCPTransport) DialTimeout(addr string, timeout time.Duration) (net.Conn
 
 // StreamCh returns a channel that can be read to handle incoming stream
 // connections from other peers.
-func (t *TCPTransport) StreamCh() <-chan net.Conn {
+func (t *QuicTransport) StreamCh() <-chan quic.Connection {
 	return t.connCh
 }
 
 // Shutdown is called when memberlist is shutting down; this gives the
 // transport a chance to clean up any listeners.
-func (t *TCPTransport) Shutdown() error {
+func (t *QuicTransport) Shutdown() error {
 	// This will avoid log spam about errors when we shut down.
 	t.shutdown.Store(1)
 
 	// Rip through all the connections and shut them down.
-	for _, conn := range t.tcpListeners {
+	for _, conn := range t.quicListeners {
 		_ = conn.Close()
 	}
 
@@ -575,7 +555,7 @@ func (t *TCPTransport) Shutdown() error {
 	return nil
 }
 
-func (t *TCPTransport) registerMetrics(registerer prometheus.Registerer) {
+func (t *QuicTransport) registerMetrics(registerer prometheus.Registerer) {
 	const subsystem = "memberlist_tcp_transport"
 
 	t.incomingStreams = promauto.With(registerer).NewCounter(prometheus.CounterOpts{
@@ -645,6 +625,6 @@ func (t *TCPTransport) registerMetrics(registerer prometheus.Registerer) {
 		Namespace: t.cfg.MetricsNamespace,
 		Subsystem: subsystem,
 		Name:      "unknown_connections_total",
-		Help:      "Number of unknown TCP connections (not a packet or stream)",
+		Help:      "Number of unknown Quic connections (not a packet or stream)",
 	})
 }
